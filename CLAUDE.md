@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-Reverse engineering **AnarchyKenshi**, a Kenshi multiplayer mod (v0.103.2), with Claude doing the
+Reverse engineering **AnarchyKenshi**, a Kenshi multiplayer mod (v0.133.1), with Claude doing the
 analysis and the user directing it. The mod is four native x64 C++ DLLs in
-`KenshiMultiplayer 0.103.2 …/AnarchyKenshi/`: `AnarchyKenshi.dll` (~17 MB, main logic),
+`KenshiMultiplayer 0.133.1/AnarchyKenshi/`: `AnarchyKenshi.dll` (~23 MB, main logic),
 `AnarchyCore.dll`, `AnarchyLauncher.dll`, `AnarchyLoader.dll`, loaded as an Ogre plugin via the
 game's `Plugins_x64.cfg`; plus enable/disable scripts and `AnarchyKenshi.cfg` (game server address).
 The goal and what comes after understanding the mod are the user's call; ask when it changes the work.
