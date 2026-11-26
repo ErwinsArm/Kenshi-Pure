@@ -105,14 +105,12 @@ open mode `8` = `ios::app` in MSVC, *inferred* from the constant) as
   v0.133.1 file (SHA-256 `3322a718…2efa`) still contains those API names (*measured*: string
   grep; import table not re-read). Likely a pre-game launcher / server browser / updater; not
   analysed yet.
-- `AnarchyCore.dll` is not referenced by the loader; its name appears in AnarchyKenshi.dll and
-  AnarchyLauncher.dll (*measured*: string grep, both versions). Whether it is a static import or
-  loaded at runtime is not checked yet.
-- `AnarchyKenshi.dll` contains `?startPlugin@@YAXXZ` (*measured*: string present, both versions;
-  export table not yet read) and also mentions `AnarchyPreload.dll`.
+- `AnarchyCore.dll` is not referenced by the loader. `AnarchyKenshi.dll` loads it at runtime with
+  `LoadLibraryA(<its own folder>\AnarchyCore.dll)` and resolves 347 exports one by one with
+  `GetProcAddress` (*measured*, see [AnarchyKenshi.dll.md](AnarchyKenshi.dll.md)).
+- `AnarchyKenshi.dll` exports only `?startPlugin@@YAXXZ` (RVA `0x1b20`), the name this loader
+  resolves (*measured*: export table of v0.133.1).
 
 ## Open questions
 
 - What `launcherInstall` does with the callback and its return value (AnarchyLauncher.dll).
-- What `startPlugin` in AnarchyKenshi.dll sets up first (hooks, network, Ogre/Kenshi objects).
-- How AnarchyCore.dll is loaded and what it provides.

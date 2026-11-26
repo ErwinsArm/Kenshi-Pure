@@ -1,0 +1,800 @@
+# Kenshi addresses used by AnarchyKenshi.dll v0.133.1 (SHA-256 c3d2419d...51bb), decoded from its two site tables.
+# RVAs into kenshi_x64.exe. steam_rva checked by pattern against Steam kenshi_x64.exe SHA-256 a596ab4e...aeb1 (all rows match). gog_rva not checked (no GOG exe).
+# table A: AnarchyKenshi.dll RVA 0xec4570, 48-byte rows. table B: RVA 0xece680, 80-byte rows. kind: code = address of a function or code site; ref = address read from a RIP-relative operand of the instruction at steam_anchor (mostly globals; Global_* rows carry the address directly).
+# detoured: yes = an inline hook (own E9-jump engine) is installed on it by the listed installer function(s) in AnarchyKenshi.dll (from the decompile, see hooks.md); no = only called or read. yes is an upper bound: it includes hooks installed only in server mode or behind feature switches. Gate patches and AiTick hooks are counted in hooks.md, not here.
+table	name	gog_rva	steam_rva	kind	steam_anchor	detoured	installer_rva
+A	AIOptions_ctor	0x806180	0x806820	code		no	
+A	AI_haveFirstAidKit	0x598200	0x598860	code		yes	0x5351c0
+A	AI_haveRepairKit	0x598300	0x598960	code		yes	0x5351c0
+A	AI_rateAttackEnemiesDirect	0x5979c0	0x598020	code		yes	0x5351c0
+A	AI_rateFleeDirect	0x5a2e80	0x5a34e0	code		yes	0x5351c0
+A	AI_rateMeleeDirect	0x5a3c00	0x5a4260	code		yes	0x5351c0
+A	AI_rateProtectAlliesDirect	0x599530	0x599b90	code		yes	0x5351c0
+A	AI_rateSelfPreservationDirect	0x5996c0	0x599d20	code		yes	0x5351c0
+A	AI_rateAcquireFoodDirect	0x597650	0x597cb0	code		yes	0x5351c0
+A	AI_rateRetreatDirect	0x5a30b0	0x5a3710	code		yes	0x5351c0
+A	AI_taskBrain	0x2680e0	0x268740	code		no	
+A	AI_thinkDirect	0x510c50	0x5112b0	code		yes	0x5351c0
+A	AbstractMovementBase_motionNow	0x5c71e0	0x5c7840	code		no	
+A	AbstractMovementBase_paceNow	0x331ac0	0x332120	code		no	
+A	AbstractMovementBase_setPace_MoveSpeed	0x331ab0	0x332110	code		no	
+A	AbstractMovementBase_topSpeedLimit	0x8061b0	0x806850	code		no	
+A	AbstractMovementBase_wantSpeed_float	0x332c90	0x3332f0	code		no	
+A	ActionMenu_ctor	0x794310	0x7949b0	code		no	
+A	ActivePlatoon_getName	0x411aa0	0x412100	code		no	
+A	ActivePlatoon_insertMember	0x795f80	0x796620	code		no	
+A	ActivePlatoon_isTraderSquad	0x387300	0x387960	code		no	
+A	AnimationClassBase_playingAnimNamed	0x5b4010	0x5b4670	code		no	
+A	AnimationClassBase_playingAnim_AnimationData	0x5b2cb0	0x5b3310	code		no	
+A	AnimationClassBase_playingAnim_CombatTechniqueData	0x5b4070	0x5b46d0	code		no	
+A	AnimationClass_beginCombatMove	0x5b71a0	0x5b7800	code		yes	0x8fcee0
+A	AnimationClass_beginStagger	0x51fe30	0x520490	code		no	
+A	AnimationClass_driveCombatMove	0x5b6fa0	0x5b7600	code		yes	0x8fcee0
+A	AnimationClass_finishCombatMove	0x5b3600	0x5b3c60	code		yes	0x8fcee0
+A	AnimationClass_finishStagger	0x51e1e0	0x51e840	code		no	
+A	AnimationClass_hasActionAnim	0x2ad990	0x2adff0	code		no	
+A	AnimationClass_playOnLayer	0x5b7460	0x5b7ac0	code		no	
+A	AnimationClass_hasClipFor	0x5b2080	0x5b26e0	code		no	
+A	AnimationClass_setFightLegsRest	0x51c2c0	0x51c920	code		no	
+A	AnimationClass_setFightStance	0x51c5d0	0x51cc30	code		no	
+A	AnimationClass_setFightTorsoRest	0x51c2e0	0x51c940	code		no	
+A	AnimationClass_startActionAnim_string_float_float_bool	0x51fd50	0x5203b0	code		yes	0x538630
+A	AnimationClass_stopActionAnim_0	0x51d940	0x51dfa0	code		yes	0x538630
+A	Armour_missesPart	0x65cfc0	0x65d620	code		no	
+A	Bounds2D_spanX	0xa08080	0xa08940	code		no	
+A	Bounds2D_spanY	0xa08090	0xa08950	code		no	
+A	BountyLedger_addBounty	0x853780	0x853e20	code		yes	0x793b60
+A	BountyLedger_awardCrimeBounty	0x853820	0x853ec0	code		yes	0x793b60
+A	BountyLedger_bountySum	0x8530a0	0x853740	code		no	
+A	BountyLedger_crimeLabel	0x855e90	0x856530	code		no	
+A	BountyLedger_forgiveBounty	0x853350	0x8539f0	code		yes	0x793b60
+A	BountyLedger_inCrime	0x851430	0x851ad0	code		no	
+A	Building_hasInside	0x290ff0	0x291650	code		no	
+A	Building_homeSquadLeader	0x547540	0x547ba0	code		no	
+A	Building_townPtr	0xf6c00	0xf6c20	code		no	
+A	CharBody_riseFromRagdoll	0x5c6390	0x5c69f0	code		no	
+A	CharMovement_followClipMotion	0x65dbe0	0x65e240	code		yes	0x902130
+A	CharMovement_goToDirect_Character_MovePriority	0x65de20	0x65e480	code		yes	0x902130
+A	CharMovement_goToDirect_RootObjectBase_MovePriority	0x65ddc0	0x65e420	code		yes	0x902130
+A	CharMovement_goToDirect_Vector3_MovePriority_bool	0x660c10	0x661270	code		yes	0x902130
+A	CharMovement_haltDirect	0x65f610	0x65fc70	code		yes	0x902130
+A	CharMovement_inLoadedInterior	0x65d6c0	0x65dd20	code		no	
+A	CharMovement_lookAtTarget	0x2adc80	0x2ae2e0	code		no	
+A	CharMovement_placeAndJumpDirect	0x65e2e0	0x65e940	code		no	
+A	CharMovement_placeDirect	0x65e210	0x65e870	code		no	
+A	CharMovement_pressAttack	0x2ae2a0	0x2ae900	code		yes	0x902130
+A	CharMovement_restore	0x661930	0x661f90	code		yes	0x20c80
+A	CharMovement_setMoveMode	0x65eab0	0x65f110	code		yes	0x902130
+A	CharMovement_steer	0x332ca0	0x333300	code		no	
+A	CharMovement_storeyNow	0x660a80	0x6610e0	code		no	
+A	CharMovement_updateDirect	0x65f940	0x65ffa0	code		yes	0x902130
+A	CharStats_awardSkillXp	0x8c6a50	0x8c7310	code		no	
+A	CharStats_bindWeapon	0x897670	0x897f30	code		no	
+A	CharStats_carryXpFactor	0x8c5800	0x8c60c0	code		no	
+A	CharStats_heavyHitThreshold	0x883760	0x884020	code		no	
+A	CharStats_meleeDamage	0x885ff0	0x8868b0	code		no	
+A	CharStats_moveXp	0x8c5da0	0x8c6660	code		no	
+A	CharStats_runXpFactor	0x8c5600	0x8c5ec0	code		no	
+A	Character_moveKind	0x5c7970	0x5c7fd0	code		no	
+A	CharStats_parryRate	0x607b70	0x6081d0	code		no	
+A	CharStats_recountDirect	0x885df0	0x8866b0	code		no	
+A	CharStats_runCap	0x2ad950	0x2adfb0	code		no	
+A	CharStats_skillLabel	0x887b80	0x888440	code		no	
+A	CharStats_skillRef	0x8838d0	0x884190	code		no	
+A	CharStats_skillValue	0x884200	0x884ac0	code		no	
+A	CharStats_swingRate	0x2ad940	0x2adfa0	code		no	
+A	CharacterHuman_sheatheDirect	0x5cc1c0	0x5cc820	code		yes	0x902130
+A	CharacterStatsWindow_fillSkills	0x8ab090	0x8ab950	code		yes	0xc08180
+A	Character_ageDirect	0x5e5320	0x5e5980	code		no	
+A	Character_animDriver	0x64600	0x64620	code		no	
+A	Character_appearancePtr	0x645e0	0x64600	code		no	
+A	Character_asHumanDirect	0x5e1860	0x5e1ec0	code		no	
+A	Character_assignRaceDirect	0x5c8d70	0x5c93d0	code		no	
+A	Character_attackBody	0x5caa40	0x5cb0a0	code		yes	0x8edb40
+A	Character_attackTargetHandle	0x435140	0x4357a0	code		no	
+A	Character_attackerCount	0x5ca0b0	0x5ca710	code		no	
+A	Character_attackersInto	0x5caaf0	0x5cb150	code		no	
+A	Character_beLifted	0x5ce730	0x5ced90	code		yes	0xb9bb10
+A	Character_brain	0x268070	0x2686d0	code		no	
+A	Character_canReach	0x65d500	0x65db60	code		no	
+A	Character_carriedHandle	0x339c00	0x33a260	code		no	
+A	Character_carriedWeight	0x5c8370	0x5c89d0	code		no	
+A	Character_charBody	0x2860b0	0x286710	code		no	
+A	Character_checkOnScreen	0x5c9900	0x5c9f60	code		yes	0x902130;FUN_180bfa030
+A	Character_clearJobList	0x5c8980	0x5c8fe0	code		yes	0x8fb170
+A	Character_declareDead	0x7a5b60	0x7a6200	code		no	
+A	Character_dropCarried	0x5cdb80	0x5ce1e0	code		yes	0x8edb40
+A	Character_dropJob	0x5c8850	0x5c8eb0	code		no	
+A	Character_endLinkedAnim	0x3346d0	0x334d30	code		no	
+A	Character_endRagdoll	0x5d26c0	0x5d2d20	code		no	
+A	Character_giveOrder	0x5d1a70	0x5d20d0	code		yes	0x8edb40
+A	Character_goTo	0x5c8f50	0x5c95b0	code		yes	0x8eca60
+A	Character_hasDied	0x620f50	0x6215b0	code		no	
+A	Character_hasSquad	0x5c5f40	0x5c65a0	code		no	
+A	Character_hoist	0x5cf930	0x5cff90	code		yes	0xb9bb10
+A	Character_inCombatStance	0x435fb0	0x436610	code		no	
+A	Character_inLastingSquad	0x620de0	0x621440	code		no	
+A	Character_inRagdoll	0x7d0da0	0x7d1440	code		no	
+A	Character_inRangedFight	0x436050	0x4366b0	code		no	
+A	Character_ingest	0x5d0120	0x5d0780	code		yes	0xbfe6d0
+A	Character_isAllyDirect	0x791d30	0x7923d0	code		yes	0xc09760
+A	Character_isBeingHauled	0x14a9a0	0x14aaa0	code		no	
+A	Character_isEnemyDirect	0x79c2b0	0x79c950	code		yes	0xc09760
+A	Character_isHungryNow	0x5c7910	0x5c7f70	code		no	
+A	Character_isPlayerOwned	0x791030	0x7916d0	code		no	
+A	Character_isShackled	0x32d900	0x32df60	code		no	
+A	Character_isSneaking	0x5c90f0	0x5c9750	code		no	
+A	Character_jobAt	0x5c8890	0x5c8ef0	code		no	
+A	Character_jobLabelAt	0x5c8870	0x5c8ed0	code		no	
+A	Character_jobListSize	0x5c88d0	0x5c8f30	code		no	
+A	Character_jobTaskAt	0x5c88b0	0x5c8f10	code		no	
+A	Character_joinFactionDirect	0x5cb460	0x5cbac0	code		no	
+A	Character_layStateDirect	0x5c77b0	0x5c7e10	code		no	
+A	Character_leaveFight	0x5c8b60	0x5c91c0	code		no	
+A	Character_loadCheckDirect	0x5c8db0	0x5c9410	code		no	
+A	Character_looksRecord	0xcd350	0xcd370	code		no	
+A	Character_medicalPtr	0xcd360	0xcd380	code		no	
+A	Character_meleeCombat	0x5c8c50	0x5c92b0	code		no	
+A	Character_memorize_Character_CharacterPerceptionTags_ShortTerm	0x673e40	0x6744a0	code		yes	0x1ee90
+A	Character_noteAttacker	0x5c8c30	0x5c9290	code		no	
+A	Character_noteShot	0x439630	0x439c90	code		yes	0xbfcbc0
+A	Character_orderSwitch	0x5c9060	0x5c96c0	code		no	
+A	Character_placeVisual	0x5c7ee0	0x5c8540	code		no	
+A	Character_playLinkedAnim	0x5b0a50	0x5b10b0	code		no	
+A	Character_positionDirect	0x5ce020	0x5ce680	code		no	
+A	Character_prefersRanged	0x7f21a0	0x7f2840	code		no	
+A	Character_prisonerMayLeave	0x5c98a0	0x5c9f00	code		yes	0xb9bb10
+A	Character_queueJob	0x5c8740	0x5c8da0	code		yes	0x8fb170
+A	Character_rawPosition	0x663d50	0x6643b0	code		no	
+A	Character_remembersAs_Character_CharacterPerceptionTags_ShortTerm	0x678300	0x678960	code		no	
+A	Character_removeJobAt	0x5c89a0	0x5c9000	code		yes	0x8fb170
+A	Character_residentOf	0x5cdf90	0x5ce5f0	code		no	
+A	Character_setChainedMode	0x32df30	0x32e590	code		no	
+A	Character_setImprisoned	0x32ffa0	0x330600	code		yes	0xb9bb10
+A	Character_setInBed	0x32dc90	0x32e2f0	code		yes	0xb9bb10
+A	Character_setLooksRecord	0x5b9830	0x5b9e90	code		no	
+A	Character_setOrderSwitchDirect	0x5ca3f0	0x5caa50	code		yes	0x8fb170
+A	Character_setRagdoll	0x5cb700	0x5cbd60	code		no	
+A	Character_setSneaking	0x5ca340	0x5ca9a0	code		no	
+A	Character_setVisibleDirect	0x5c8190	0x5c87f0	code		no	
+A	Character_shackleItem	0x5c83b0	0x5c8a10	code		no	
+A	Character_shiftJob	0x5c8960	0x5c8fc0	code		yes	0x8fb170
+A	Character_setSlaveOwner	0x32ddd0	0x32e430	code		no	
+A	Character_setShaved	0x5b1e40	0x5b24a0	code		no	
+A	Character_slaveState	0x5c8440	0x5c8aa0	code		no	
+A	Character_sneakKoChance	0x884a30	0x8852f0	code		yes	0xc08180
+A	Character_sneakingOrCrawling	0x663d70	0x6643d0	code		no	
+A	Character_squadPtr	0x791470	0x791b10	code		no	
+A	Character_statSheet	0xdee60	0xdee80	code		no	
+A	Character_teleport_Vector3	0x5ca020	0x5ca680	code		no	
+A	Character_playSound	0x5c9410	0x5c9a70	code		no	
+A	Character_setSoundSwitch	0x5c9320	0x5c9980	code		no	
+A	CombatMover_animateFightStep	0x2adb50	0x2ae1b0	code		no	
+A	CombatMover_fightStep	0x2aeb80	0x2af1e0	code		yes	0x902130
+A	CombatMover_fightStepCrippled	0x2ae980	0x2aefe0	code		yes	0x902130
+A	Crossbow_rangeUnits	0x434820	0x434e80	code		no	
+A	Dialogue_say_string_DialogLineData	0x67f720	0x67fd80	code		yes	0xcdad30
+A	DoorStuff_barDoor	0x296390	0x2969f0	code		yes	0xcdf510
+A	DoorStuff_doorState	0x3374a0	0x337b00	code		no	
+A	DoorStuff_isLocked	0x2e9bc0	0x2ea220	code		no	
+A	DoorStuff_swingOpen	0x2969e0	0x297040	code		yes	0xcdf510
+A	DoorStuff_swingShut	0x2985f0	0x298c50	code		yes	0xcdf510
+A	DoorStuff_unbarDoor	0x569d70	0x56a3d0	code		yes	0xcdf510
+A	FactionRegistry_allFactions	0x878130	0x878980	code		no	
+A	FactionRegistry_factionBySid	0x2e73c0	0x2e7a20	code		no	
+A	FactionRegistry_factionNamed	0x2e72f0	0x2e7950	code		no	
+A	FactionRegistry_factionOrNew_GameData	0x2e7030	0x2e7690	code		no	
+A	FactionRegistry_factionOrNew_string_string	0x2e7190	0x2e77f0	code		no	
+A	FactionRelations_isAlly	0x6b1fd0	0x6b2630	code		no	
+A	FactionRelations_isFoeRaw	0x6b1f70	0x6b25d0	code		no	
+A	FactionRelations_setStanding	0x6b4720	0x6b4d80	code		no	
+A	Faction_getName	0x2865d0	0x286c30	code		no	
+A	Faction_createSquad	0x7f3d80	0x7f4420	code		no	
+A	Faction_initRelations	0x7f20b0	0x7f2750	code		no	
+A	Faction_liveSquads	0x2e6bb0	0x2e7210	code		no	
+A	Faction_setupRelations	0x7f48a0	0x7f4f40	code		no	
+A	Faction_ownedByPlayer	0xd5fe0	0xd6000	code		no	
+A	FactoryCallbackInterface_ctor	0x4eb7c0	0x4ebe20	code		no	
+A	FloatingProgressBar_setCaption	0x6e42b0	0x6e4910	code		no	
+A	FloatingProgressBar_setFill	0x6e2ed0	0x6e3530	code		no	
+A	ForgottenGUI_closeMessageBox	0x73f580	0x73fbe0	code		no	
+A	ForgottenGUI_inEditor	0x47a2a0	0x47a900	code		no	
+A	ForgottenGUI_modalOpen	0x73f590	0x73fbf0	code		no	
+A	ForgottenGUI_toggleMainGui	0x6e23c0	0x6e2a20	code		no	
+A	ForgottenGUI_newProgressBar	0x73f450	0x73fab0	code		no	
+A	ForgottenGUI_newScreenLabel	0x73f490	0x73faf0	code		yes	0x908210
+A	ForgottenGUI_setCursor_CursorType_hand_hand	0x6e41c0	0x6e4820	code		yes	0xc08180
+A	GameDataContainer_createNewData	0x6c00f0	0x6c0750	code		no	
+A	GameDataContainer_getData_string	0x6bce80	0x6bd4e0	code		no	
+A	GameDataContainer_recordNamed	0x6bf740	0x6bfda0	code		no	
+A	GameDataContainer_recordsOfKind	0x6bfdc0	0x6c0420	code		no	
+A	GameData_addLink	0xb6190	0xb61b0	code		no	
+A	GameData_clearLinks	0xb62e0	0xb6300	code		no	
+A	GameData_copyFrom	0x2e5e30	0x2e6490	code		no	
+A	GameData_removeLink_string_string	0x6caab0	0x6cb110	code		no	
+A	GameData_storeToFile	0x6c02d0	0x6c0930	code		no	
+A	GameTime_ctor_0	0xccf70	0xccf90	code		no	
+A	GameTime_totalHours	0xccfd0	0xccff0	code		no	
+A	GameWorld_addToTick	0x7875d0	0x787c70	code		yes	0x52f7f0
+A	GameWorld_clockNow	0x66c5b0	0x66cc10	code		no	
+A	GameWorld_destroy_RootObject_bool_char	0x799450	0x799af0	code		yes	0xbd7930
+A	GameWorld_fillZoneTemp	0x9edfc0	0x9ee880	code		yes	0x52f7f0
+A	GameWorld_flipPause	0x7876a0	0x787d40	code		yes	0x52f7f0
+A	GameWorld_frameGpuDirect	0x788360	0x788a00	code		yes	0x43df0
+A	GameWorld_frameRate	0x66c100	0x66c760	code		no	
+A	GameWorld_fromDeadList	0x7ccda0	0x7cd440	code		yes	0x1ee90
+A	GameWorld_hourSeconds	0x66cd90	0x66d3f0	code		no	
+A	GameWorld_isHalted	0xdede0	0xdee00	code		no	
+A	GameWorld_objectsNear	0x785b00	0x7861a0	code		no	
+A	GameWorld_playerPause	0x787910	0x787fb0	code		yes	0x52f7f0
+A	GameWorld_removeFromTick	0x786e40	0x7874e0	code		no	
+A	GameWorld_setFrameRate	0x787610	0x787cb0	code		yes	0x52f7f0
+A	GameWorld_setWorldSpeed	0x7877a0	0x787e40	code		yes	0x52f7f0
+A	GameWorld_tickedCharacters	0x663d00	0x664360	code		no	
+A	GunClass_isActive	0x43fe50	0x4404b0	code		no	
+A	GunClass_reloadSeconds	0x4359b0	0x436010	code		no	
+A	GunClass_reloading	0x2fd6f0	0x2fdd50	code		no	
+A	GunClass_shoot	0x43a0d0	0x43a730	code		yes	0x801a80
+A	HealthPartStatus_hpCapNow	0x296610	0x296c70	code		no	
+A	HealthPartStatus_isProsthetic	0x643410	0x643a70	code		no	
+A	HealthPartStatus_prostheticSlot	0x643540	0x643ba0	code		no	
+A	HealthPartStatus_refreshPart	0x6435c0	0x643c20	code		no	
+A	InputHandler_boundAction	0x3613e0	0x361a40	code		no	
+A	InputHandler_hasBinding_int	0x360950	0x360fb0	code		no	
+A	InputHandler_unbind_string	0x361c90	0x3622f0	code		no	
+A	InventoryItemBase_isLoose	0x37d630	0x37dc90	code		no	
+A	InventorySection_entryCount	0x7461a0	0x746840	code		no	
+A	InventorySection_fits	0x74b7a0	0x74be40	code		no	
+A	InventorySection_freeSpotFor	0x74b820	0x74bec0	code		no	
+A	InventorySection_itemAt	0x746660	0x746d00	code		no	
+A	InventorySection_inventoryOf	0x745520	0x745bc0	code		no	
+A	InventorySection_occupiedAt	0x746050	0x7466f0	code		no	
+A	InventorySection_placeItemDirect	0x749080	0x749720	code		yes	0xbeda20
+A	InventorySection_removeItem	0x749380	0x749a20	code		no	
+A	InventorySection_slotAccepts_Item	0x74b590	0x74bc30	code		no	
+A	InventorySection_slotEntries	0x296510	0x296b70	code		no	
+A	Inventory_addItemDirect	0x7455e0	0x745c80	code		yes	0xbeda20
+A	Inventory_allSections	0xd5310	0xd5330	code		no	
+A	Inventory_bestItemFor	0x745cb0	0x746350	code		no	
+A	Inventory_dropDirect	0x7456f0	0x745d90	code		yes	0xbdf000
+A	Inventory_sectionAt	0x745850	0x745ef0	code		no	
+A	Inventory_getSection	0x747510	0x747bb0	code		no	
+A	Inventory_isStorage	0x745570	0x745c10	code		no	
+A	Inventory_leastChargedFor_ItemFunction	0x745de0	0x746480	code		no	
+A	Inventory_markChanged	0x746ef0	0x747590	code		no	
+A	Inventory_onSectionAddDirect	0x746f10	0x7475b0	code		yes	0xbeda20
+A	Inventory_onSectionChangeDirect	0x746f40	0x7475e0	code		yes	0xbeda20
+A	Inventory_onSectionRemoveDirect	0x746f60	0x747600	code		yes	0xbeda20
+A	Inventory_ownerCharacter	0x70c890	0x70cef0	code		no	
+A	Inventory_putOn	0x74bfb0	0x74c650	code		yes	0xbeda20
+A	Inventory_recountWeight	0x746da0	0x747440	code		no	
+A	Inventory_removeAndFreeDirect	0x745740	0x745de0	code		yes	0xbeda20
+A	Inventory_takeOutDirect	0x74a370	0x74a950	code		yes	0xbeda20
+A	Inventory_tryAddDirect	0x74b680	0x74bd20	code		yes	0xbeda20
+A	Inventory_weightSum	0x746d30	0x7473d0	code		no	
+A	Item_bagHandle	0x595ee0	0x596540	code		no	
+A	Item_despawnDirect	0x75cf80	0x75d620	code		no	
+A	Item_isKept	0x37d670	0x37dcd0	code		no	
+A	Item_placeRotatedDirect	0x75cfc0	0x75d660	code		no	
+A	Item_spawnDirect_bool_Vector3_Quaternion_bool_TriState_bool	0x75d310	0x75d9b0	code		no	
+A	LockData_isLocked	0x2a9f30	0x2aa590	code		no	
+A	MedicalSystem_amputate	0x64e760	0x64edc0	code		no	
+A	MedicalSystem_bloodCap	0x643a40	0x6440a0	code		no	
+A	MedicalSystem_breakProsthetic	0x6434f0	0x643b50	code		no	
+A	MedicalSystem_clampHealth	0x644f40	0x6455a0	code		no	
+A	MedicalSystem_fitProsthetic	0x645030	0x645690	code		yes	0x7afd30
+A	MedicalSystem_forceKnockout	0x5c6f70	0x5c75d0	code		no	
+A	MedicalSystem_healthScore	0x886320	0x886be0	code		no	
+A	MedicalSystem_inflictWound	0x650270	0x6508d0	code		no	
+A	MedicalSystem_injurySlowdown	0x8840b0	0x884970	code		no	
+A	MedicalSystem_limbCondition	0x6434d0	0x643b30	code		no	
+A	MedicalSystem_partAt_Limb_Prosthetics	0x656f30	0x657590	code		no	
+A	MedicalSystem_partAt_unsigned_int64	0x2a9fa0	0x2aa600	code		no	
+A	MedicalSystem_partTotal	0x2a9f90	0x2aa5f0	code		no	
+A	MedicalSystem_recheckCollapse	0x648cc0	0x649320	code		no	
+A	OpenSaveFileDialog_setFolder	0x1a01f0	0x1a0850	code		no	
+A	OrdersReceiver_goalNow	0x268080	0x2686e0	code		no	
+A	OrdersReceiver_jobsOn	0x50bfa0	0x50c600	code		no	
+A	OrdersReceiver_setJobsOn	0x507bb0	0x508210	code		no	
+A	Platoon_liveSquad	0x2680c0	0x268720	code		no	
+A	PlayerInterface_aimCamera	0x7f2410	0x7f2ab0	code		no	
+A	PlayerInterface_ctor	0x7f6490	0x7f6b30	code		no	
+A	PlayerInterface_deselectAll	0x7f8700	0x7f8da0	code		no	
+A	PlayerInterface_followWithCamera	0x7f4d60	0x7f5400	code		no	
+A	PlayerInterface_grabItem	0x7fad00	0x7fb3a0	code		no	
+A	PlayerInterface_isPicked	0x7f4680	0x7f4d20	code		no	
+A	PlayerInterface_joinFaction	0x801e80	0x802520	code		no	
+A	PlayerInterface_newSquad	0x7f4270	0x7f4910	code		no	
+A	PlayerInterface_onFactoryObject	0x4d32b0	0x4d3910	code		no	
+A	PlayerInterface_orderNearestSelected	0x7fa7d0	0x7fae70	code		yes	0xc08180
+A	PlayerInterface_pickObject	0x7f8960	0x7f9000	code		no	
+A	PlayerInterface_pickOwned	0x7f8a10	0x7f90b0	code		no	
+A	PlayerInterface_pickOwnedRaw	0x7f88c0	0x7f8f60	code		no	
+A	PlayerInterface_recruit_Character_bool	0x6921c0	0x692820	code		no	
+A	PlayerInterface_recruit_Character_lektor_bool	0x7ff210	0x7ff8b0	code		no	
+A	PlayerInterface_wipeAll	0x7f9e40	0x7fa4e0	code		no	
+A	Prosthetics_limbPiece	0xcd440	0xcd460	code		no	
+A	RagdollAnimation_isPlaying	0x7d0d60	0x7d1400	code		no	
+A	RangedCombat_end	0x436e10	0x437470	code		no	
+A	RangedCombat_launcherOf	0x433f60	0x4345c0	code		no	
+A	RangedCombat_setup	0x433f10	0x434570	code		no	
+A	RangedCombat_tickRanged	0x438610	0x438c70	code		no	
+A	RootObjectBase_factionDirect	0x593fe0	0x594640	code		no	
+A	RootObjectBase_getHandle	0xb85f0	0xb8610	code		no	
+A	RootObjectBase_positionDirect	0xd1de0	0xd1e00	code		no	
+A	RootObjectFactory_createBuilding	0x57c610	0x57cc70	code		no	
+A	RootObjectFactory_createItem_GameData_hand_GameData_GameData_int_Faction	0x5800f0	0x580750	code		no	
+A	RootObjectFactory_spawnCharacter	0x583080	0x5836e0	code		no	
+A	RootObject_orientationDirect	0xd1ee0	0xd1f00	code		no	
+A	SaveManager_activeSave	0x47a8f0	0x47af50	code		no	
+A	SaveManager_getSingleton	0x37d6a0	0x37dd00	code		no	
+A	SaveManager_listSaves_SaveInfo_lektor_bool	0x47f640	0x47fca0	code		no	
+A	SaveManager_load_SaveInfo_bool	0x47abb0	0x47b210	code		yes	0xc11a40
+A	SaveManager_load_string	0x47ae20	0x47b480	code		yes	0xc11a40
+A	SaveManager_save	0x47b2c0	0x47b920	code		yes	0xc11a40
+A	SaveManager_startNewGame	0x47ab40	0x47b1a0	code		yes	0xc11a40
+A	SelectionBox_ctor	0x7f3600	0x7f3ca0	code		no	
+A	StorageBuilding_outputSlot	0x595ec0	0x596520	code		no	
+A	TaskBrain_goalText	0x50ed60	0x50f3c0	code		no	
+A	TaskMatch_key	0x267f40	0x2685a0	code		no	
+A	TitleScreen_constructDirect	0x918630	0x918ef0	code		yes	0xb71e0
+A	TitleScreen_getSingleton	0x912510	0x912dd0	code		no	
+A	TitleScreen_showDirect	0x9125c0	0x912e80	code		no	
+A	TitleScreen_updateDirect	0x912fc0	0x913880	code		yes	0xb71e0
+A	TownBase_shownName	0x929d20	0x92a5e0	code		no	
+A	Town_assignResidents	0x936810	0x9370d0	code		yes	0xb9bb10
+A	Town_baseRecord	0x926380	0x926c40	code		no	
+A	UtilityT_groundHeight	0x9b2e50	0x9b3710	code		no	
+A	UtilityT_toScreenPixels	0x9b2b30	0x9b33f0	code		no	
+A	VisibleState_setSlaveState	0x5a42e0	0x5a4940	code		yes	0x780220
+A	ZoneManager_activateZoneMap_iVector2_int_ZoneWaker_bool	0x8780b0	0x878900	code		no	
+A	ZoneManager_isLoading	0x3b28c0	0x3b2f20	code		no	
+A	ZoneManager_liveZoneCount	0x903570	0x903e30	code		no	
+A	ZoneManager_liveZones	0xa09e50	0xa0a710	code		no	
+A	ZoneManager_maybeRefillTown	0x9fece0	0x9ff5a0	code		yes	0x52f7f0
+A	ZoneManager_wakeAt	0xa0ed80	0xa0f640	code		no	
+A	ZoneMap_loadedNow	0xa087f0	0xa090b0	code		no	
+A	ZoneMap_sleepCountdown	0xa08ac0	0xa09380	code		no	
+A	ZoneMap_wokenBy	0xa08180	0xa08a40	code		no	
+A	ZoneMap_zoneLoadingMT	0xa08810	0xa090d0	code		no	
+A	hand_buildingPtr	0x792270	0x792910	code		no	
+A	hand_characterPtr	0x7979f0	0x798090	code		no	
+A	hand_ctor_0	0xccfe0	0xcd000	code		no	
+A	hand_ctor_GameData_itemType	0x794d80	0x795420	code		no	
+A	hand_ctor_hand	0xd1b00	0xd1b20	code		no	
+A	hand_isEmpty	0x36aaa0	0x36b100	code		no	
+A	hand_itemPtr	0x792290	0x792930	code		no	
+A	hand_objectPtr	0x79cd70	0x79d410	code		no	
+A	hand_op_assign_RootObjectBase	0x791f70	0x792610	code		no	
+A	hand_op_assign_hand	0xcd100	0xcd120	code		no	
+A	hand_op_eq_bool	0xcd0e0	0xcd100	code		no	
+A	hand_op_eq_hand	0xcd040	0xcd060	code		no	
+A	hand_op_ne_hand	0xcd090	0xcd0b0	code		no	
+A	hand_setNull	0x143d10	0x143e10	code		no	
+A	hand_squadPtr	0x7921f0	0x792890	code		no	
+A	hand_townPtr	0x7922e0	0x792980	code		no	
+A	iVector2_ctor_int_int	0x37e280	0x37e900	code		no	
+A	AnimationClass_playAtPhase	0x5b7670	0x5b7cd0	code		no	
+A	AnimationClass_fadeClip	0x5b37b0	0x5b3e10	code		no	
+B	Havok_MemoryRouterCtor	0xba4d80	0xba5640	code		no	
+B	Havok_OwnThreadRegister	0x3a1240	0x3a18a0	code		no	
+B	Havok_InitThreadMemory	0xbaf300	0xbafbc0	code		no	
+B	Havok_QuitThreadMemory	0xbaf350	0xbafc10	code		no	
+B	Havok_MemoryRouterDtor	0xba9b90	0xbaa450	code		no	
+B	AnimationClass_beginStaggerHook	0x51fe30	0x520490	code		no	
+B	AnimationClass_finishStaggerHook	0x51e1e0	0x51e840	code		no	
+B	CombatClass_attackSlotsReader	0x664d00	0x665360	code		no	
+B	AiStopSite_Halt	0x60d326	0x60d986	code		no	
+B	AiStopSite_Order	0x60d472	0x60dad2	code		no	
+B	WitnessCrime_attackSite	0x854b66	0x855206	code		no	
+B	CombatStopSite_InitMode	0x665638	0x665c98	code		no	
+B	Character_takeMeleeHit	0x438e90	0x4394f0	code		yes	0xbfcbc0
+B	CombatClass_checkSwingHit	0x609c90	0x60a2f0	code		yes	0xbfdab0
+B	CombatClassAI_answerEngage	0x6663d0	0x666a30	code		yes	0xb79160
+B	combat_ratingContest	0x664d10	0x665370	code		yes	0xb79160
+B	CombatClass_findTargetsInSwing	0x608140	0x6087a0	code		yes	0xbfdab0
+B	ActionMenu_open	0x7a6520	0x7a6bc0	code		yes	0xc08180
+B	ContextMenuGUI_show	0x7a7940	0x7a7fe0	code		yes	0xc08180
+B	ContextMenu_orderLabel	0x79ac30	0x79b2d0	code		yes	0xc08180
+B	PlayerInterface_menuOrder	0x7f9fb0	0x7fa650	code		yes	0xc08180
+B	PlayerInterface_isHostile	0x79c540	0x79cbe0	code		yes	0xc08180
+B	PlayerInterface_updateMouseOver	0x7fad70	0x7fb410	code		no	
+B	Character_safeToRise	0x5c9df0	0x5ca450	code		yes	0xc010d0
+B	GameWorld_destructor	0x86cfb0	0x86d650	code		yes	0xc1b6a0
+B	FloaterGUI_update	0x6e9a10	0x6ea070	code		yes	0xc08180
+B	CharacterNameTag_update	0x6e7aa0	0x6e8100	code		yes	0x11c90
+B	MainBarGUI_update	0x7286f0	0x728d50	code		yes	0x11c90;FUN_18071d490
+B	PlayerInterface_handleMouse	0x800870	0x800f10	code		yes	0x11c90
+B	TerrainDecals_bloodPool	0x8dc6e0	0x8dcfa0	code		yes	0x11c90
+B	TerrainDecals_addDecal	0x8dc590	0x8dce50	code		yes	0x11c90
+B	PortraitRenderer_renderCharacter	0x84b1f0	0x84b890	code		yes	0x11c90
+B	AnimationEvents_addFromRecord	0x64df0	0x64e10	code		yes	0x1ca90
+B	CharBody_setTask	0x5c6860	0x5c6ec0	code		yes	0x1ee90
+B	Inventory_dtor	0x74a9f0	0x74b660	code		yes	0xbde230;FUN_180beda20
+B	AI_canEquipWeapon	0x998910	0x9991d0	code		no	
+B	Character_recalcArmour	0x886770	0x887030	code		no	
+B	GameWorld_deleteLater	0x79a0a0	0x79a740	code		yes	0x1ee90
+B	Perception_noteRecognizer	0x855890	0x855f30	code		yes	0x1ee90
+B	GameWorld_addToDeadList	0x7965a0	0x796c40	code		yes	0x1ee90
+B	GameWorld_removeFromDeadList	0x796600	0x796ca0	code		yes	0x1ee90
+B	GameWorld_removeFromTick	0x786e40	0x7874e0	code		yes	0x1ee90
+B	World_markLooksDirty	0x786eb0	0x787550	code		yes	0x1ee90
+B	AlarmManager_raise	0x932d20	0x9335e0	code		yes	0x1ee90
+B	Building_scratchSet	0x54ce90	0x54d4f0	code		yes	0x1ee90
+B	AI_onMeleeHit	0x999640	0x999f00	code		yes	0x1ee90
+B	AI_onShotAt	0x999490	0x999d50	code		yes	0x1ee90
+B	Dialogue_startEvent	0x684330	0x684990	code		yes	0x1ee90
+B	Physics_swingBoxQuery	0x785c40	0x7862e0	code		yes	0x1ee90
+B	Character_memorizeLongTerm	0x6733c0	0x673a20	code		yes	0x1ee90
+B	TaskBrain_requestThink	0x7914a0	0x791b40	code		yes	0x1ee90
+B	FactionRelations_save	0x6b3150	0x6b37b0	code		yes	0x60ffc0
+B	FactionRelations_standingWith	0x6b4600	0x6b4c60	code		yes	0x1ee90
+B	PlayerFactionRelations_standingWith	0x6b2be0	0x6b3240	code		yes	0x1ee90
+B	CharacterStatsWindow_buildSkillRows	0x8b9630	0x8b9ef0	code		no	
+B	CombatClass_switchPhase	0x2b2440	0x2b2aa0	code		yes	0x906310
+B	CombatClass_buildMoveSet	0x8883e0	0x888ca0	code		no	
+B	AI_findCorpseDump	0x8d07d0	0x8d1090	code		no	
+B	Stuff_useClip	0x296cd0	0x297330	code		no	
+B	Stuff_useClipKo	0x296cf0	0x297350	code		no	
+B	Character_checkOnScreenHook	0x5c9900	0x5c9f60	code		no	
+B	CharacterStatsWindow_fillSkillsHook	0x8ab090	0x8ab950	code		no	
+B	PlayerInterface_mouseItemHolder	0x6eea80	0x6ef0e0	code		no	
+B	Zone_isLoaded	0xa087f0	0xa090b0	code		no	
+B	UtilityT_rayAll	0x9b2ee0	0x9b37a0	code		no	
+B	MedicalSystem_treatWounds	0x64d1a0	0x64d800	code		yes	0xc010d0
+B	MedicalSystem_applyBandage	0x6493a0	0x649a00	code		yes	0xc010d0
+B	MedicalSystem_useUpMedkit	0x643bf0	0x644250	code		yes	0xc010d0
+B	MedicalSystem_knockout	0x644320	0x644980	code		yes	0xc010d0
+B	MedicalSystem_startKoTimer	0x644170	0x6447d0	code		yes	0xc010d0
+B	MedicalSystem_recheckCollapseHook	0x648cc0	0x649320	code		yes	0xc010d0
+B	Character_declareDeadHook	0x7a5b60	0x7a6200	code		yes	0xc010d0
+B	Character_hungerPace	0x5c9640	0x5c9ca0	code		yes	0xc010d0
+B	Character_needsFood	0x5c9730	0x5c9d90	code		yes	0xc010d0
+B	Character_isHungryNowHook	0x5c7910	0x5c7f70	code		yes	0xc010d0
+B	FactionRelations_update	0x6b2170	0x6b27d0	code		yes	0x4b510
+B	FactionRelations_affectRelations	0x6b26c0	0x6b2d20	code		yes	0x60ffc0
+B	StdString_assign	0x69ba0	0x69bc0	code		no	
+B	Roster_readOwned	0x7f7840	0x7f7ee0	code		yes	0xcc81d0
+B	LiftTask_dropSite	0x34f7a0	0x34fe00	code		no	
+B	Character_setOnScreenFlag	0x5c72c0	0x5c7920	code		no	
+B	Character_hasDiedHook	0x620f50	0x6215b0	code		no	
+B	Character_weaponInHand	0x5c9130	0x5c9790	code		no	
+B	Global_gameWorld	0x2133040	0x2134110	ref	0x874e70	no	
+B	Global_gameGui	0x21326e0	0x21337b0	ref	0x6e8c10	no	
+B	Global_gameInput	0x21322a0	0x2133370	ref	0x365370	no	
+B	Global_gameSettings	0x21323c0	0x2133490	ref	0x3e84f0	no	
+B	Global_renderMaster	0x2132230	0x2133300	ref	0x78b0bf	no	
+B	AiTick_backgroundThread	0x7872a0	0x787940	code		no	
+B	AiTick_threadTick	0x5c75d0	0x5c7c30	code		no	
+B	AiTick_threadTick4	0x5c76e0	0x5c7d40	code		no	
+B	AiTick_threadTickSlow	0x5cfa50	0x5d00b0	code		no	
+B	AiTick_factions	0x2e6f30	0x2e7590	code		no	
+B	AiTick_startThread	0x3be850	0x3beeb0	code		no	
+B	AiTick_mainTick	0x582cb0	0x583310	code		no	
+B	AiTick_charactersTick	0x786790	0x786e30	code		no	
+B	Ai_GuardSingleton	0x790f60	0x791600	code		no	
+B	Ai_GuardStaticVec	0x146960	0x146a60	code		no	
+B	Ai_GuardStaticObj	0x2e90e0	0x2e9740	code		no	
+B	Ai_GuardAnimInsert	0x51f600	0x51fc60	code		no	
+B	Ai_GuardWhoNear	0x786030	0x7866d0	code		no	
+B	Data_NpcViewRange	0x21323f8	0x21334c8	ref	0x5ca021	no	
+B	Data_FastZoneHopping	0x2132448	0x2133518	ref	0xa0f6f4	no	
+B	Data_StatsGroupsBegin	0x201ee48	0x201fe48	ref	0x8ba1a9	no	
+B	Data_CombatAttacks	0x2010f78	0x2011f78	ref	0x888edc	no	
+B	ProductionBuilding_Operate	0x2980a0	0x298700	code		yes	0xb9c0a0
+B	ProductionBuilding_update	0x29a730	0x29ad90	code		yes	0x72e5f0
+B	TortureBuilding_update	0x29a930	0x29af90	code		yes	0xb9c1e0
+B	Building_OutputRate	0x2974d0	0x297b30	code		yes	0xb9cba0
+B	Inventory_TakeSingle	0x74a550	0x74ab30	code		yes	0xbeda20
+B	TerrainSector_buildHook	0x7ea8f0	0x7eaf90	code		yes	0xc8b20
+B	Data_PhysActorsMade	0x2131fb0	0x2133080	ref	0x7eb37f	no	
+B	Data_NxuNameMap	0x212c150	0x212d220	ref	0x24be90	no	
+B	Data_AreasMap	0x2133028	0x21340f8	ref	0x100bd0	no	
+B	WeatherRegion_backThreadUpdate	0x9dd590	0x9dde50	code		yes	0x92d270
+B	WeatherRegion_pickWeather	0x9dd0c0	0x9dd980	code		yes	0x92d270
+B	WeatherState_setWeather	0x9dc6a0	0x9dcf60	code		no	
+B	EffectGroup_tick	0x102350	0x102370	code		yes	0x92f580
+B	EffectHandlerWandering_update	0x102b30	0x102b50	code		yes	0x92f580
+B	Data_NavMesh	0x21334f0	0x21345c0	ref	0xa0f950	no	
+B	SaveManager_findHook	0x470960	0x470fc0	code		yes	0x1eac40
+B	SaveFileSystem_filePath	0x4716b0	0x471d10	code		no	
+B	SaveFileSystem_rebuildIndex	0x4735d0	0x473c30	code		no	
+B	SaveFileSystem_resetIndex	0x470a40	0x4710a0	code		no	
+B	NavMesh_threadStepInstanceSite	0x3ae227	0x3ae887	code		no	
+B	NavMesh_threadStepGiveBackSite	0x3ae377	0x3ae9d7	code		no	
+B	NavGen_interiorNodesSite	0x3cbf61	0x3cc5c1	code		no	
+B	NavGen_zoneTryLock	0x3c6e90	0x3c74f0	code		no	
+B	NavGen_stitchOwnZoneSite	0x3cb3d2	0x3cba32	code		no	
+B	NavMesh_removeInterior	0x3ad0e0	0x3ad740	code		yes	0x1ea750
+B	NavMesh_createZoneInstance	0x3ad2e0	0x3ad940	code		yes	0x1ea750
+B	GameWorld_drainDeletesHook	0x79d200	0x79d8a0	code		yes	0x1eeea0
+B	Code_DeleteRegistryStep	0x79d8cf	0x79df6f	code		no	
+B	BuildMode_placePreviews	0x4d6c40	0x4d72a0	code		yes	0x5a5910;FUN_18091e2f0
+B	Building_addConstructionProgress	0x558f40	0x5595a0	code		yes	0x5a5910;FUN_18091e2f0
+B	WallBuilding_addConstructionProgress	0x5598d0	0x559f30	code		yes	0x5a5910;FUN_18091e2f0
+B	TownManager_createPlayerTown	0x934550	0x934e10	code		no	
+B	Building_confirmDismantle	0x54f840	0x54fea0	code		yes	0x91e2f0
+B	Building_addDismantleProgress	0x2a2200	0x2a2860	code		yes	0x91e2f0
+B	Building_canDismantle	0x29bd20	0x29c380	code		yes	0x91e2f0
+B	Building_canBePurchased	0x29bea0	0x29c500	code		yes	0x91e2f0
+B	Building_fillPanel	0x3011e0	0x301840	code		yes	0x91e2f0
+B	Building_fillConditions	0x301d20	0x302380	code		yes	0x91e2f0
+B	StatsPanel_addBarRow	0x729930	0x729f90	code		no	
+B	DatapanelGUI_addButtonLine	0x6fe900	0x6fef60	code		no	
+B	UseableStuff_fillPowerLines	0x307590	0x307bf0	code		yes	0x91e2f0
+B	UseableStuff_fillEfficiencyLines	0x3059f0	0x306050	code		yes	0x91e2f0
+B	Building_upgrade	0x2a4380	0x2a49e0	code		yes	0x5a5910
+B	Building_upgradeTarget	0x29b8c0	0x29bf20	code		yes	0x5a5910
+B	MoneyItem_cashIn	0x75f060	0x75f700	code		yes	0x86ce00
+B	Data_TownManager	0x2133030	0x2134100	ref	0x4db433	no	
+B	Data_ManagementScreen	0x212e428	0x212f4f8	ref	0x92da12	no	
+B	CraftingBuilding_Operate	0x2b53e0	0x2b5a40	code		yes	0x72e5f0
+B	FurnaceBuilding_Operate	0x299940	0x299fa0	code		yes	0x72e5f0
+B	FarmBuilding_Operate	0xe59c0	0xe59e0	code		yes	0x72e5f0
+B	FarmBuilding_Update	0xe5560	0xe5580	code		yes	0x72e5f0
+B	CraftingBuilding_addToQueue	0x2b5640	0x2b5ca0	code		yes	0x72e5f0
+B	CraftingBuilding_removeFromQueue	0x2b63c0	0x2b6a20	code		yes	0x72e5f0
+B	CraftingBuilding_craftables	0x2bb6c0	0x2bbd20	code		no	
+B	CharStats_raiseTowardCap	0x8c5530	0x8c5df0	code		yes	0xba1ee0
+B	CraftingBuilding_bestWeaponModel	0x2ba9c0	0x2bb020	code		no	
+B	CraftingBuilding_update	0x2b5020	0x2b5680	code		yes	0x72e5f0
+B	CraftingWindow_onRecipeClick	0x2b9110	0x2b9770	code		yes	0x72e5f0
+B	CraftingWindow_onRepeatClick	0x2b49a0	0x2b5000	code		yes	0x72e5f0
+B	UseableStuff_TogglePower	0x297400	0x297a60	code		yes	0x72e5f0
+B	ResearchBuilding_operateHook	0x29b270	0x29b8d0	code		yes	0x745ac0
+B	ResearchBuilding_completeConstructionHook	0x29b7a0	0x29be00	code		yes	0x745ac0
+B	UseableStuff_trainOperator	0x296ed0	0x297530	code		no	
+B	Research_ctor	0x831280	0x831920	code		no	
+B	Research_init	0x8344d0	0x834b70	code		no	
+B	Research_reset	0x836610	0x836cb0	code		no	
+B	Research_complete	0x833eb0	0x834550	code		no	
+B	Research_addToQueue	0x834200	0x8348a0	code		yes	0x745ac0
+B	Research_removeFromQueue	0x830740	0x830de0	code		yes	0x745ac0
+B	Research_addProgress	0x8364d0	0x836b70	code		no	
+B	Research_isKnown	0x82ec60	0x82f300	code		yes	0xba1fb0
+B	Research_isQueued	0x82e400	0x82eaa0	code		no	
+B	Research_requirementsMet	0x832900	0x832fa0	code		no	
+B	Research_canAfford	0x8327b0	0x832e50	code		no	
+B	Research_raiseBenchLevel	0x833cf0	0x834390	code		no	
+B	Research_hoursFor	0x82e670	0x82ed10	code		no	
+B	Research_isBuildingEnabled	0x82e3c0	0x82ea60	code		yes	0x745ac0
+B	Research_artifactBenchesHook	0x82e0b0	0x82e750	code		yes	0x745ac0
+B	Research_takeArtifactsHook	0x82e260	0x82e900	code		yes	0x745ac0
+B	ResearchWindow_refreshHook	0x499e60	0x49a4c0	code		yes	0x745ac0
+B	Code_ResearchPaidPushBack	0x1d50c	0x544f3	ref	0x8344fe	no	
+B	AI_updateVisibleStateHook	0x5a4b80	0x5a51e0	code		yes	0x780140
+B	Code_BountyMapIndex	0xa961	0xa966	ref	0x853e3a	no	
+B	Code_BountyMapErase	0x4c3c	0x4c3c	ref	0x8539f9	no	
+B	GateSite_BountySpotted	0x856b8d	0x85722d	code		no	
+B	Data_MinLockpickChance	0x2132e58	0x2133f28	ref	0x8ca2d8	no	
+B	Dialogue_triggerEventHook	0x685000	0x685660	code		yes	0x793eb0
+B	BlueprintItem_learnHook	0x2b5f70	0x2b65d0	code		yes	0x745ac0
+B	GeneratorBuilding_PowerGiven	0x297100	0x297760	code		yes	0x7304e0
+B	Character_isCampaignLeader	0x9c4250	0x9c4b10	code		yes	0x60a60
+B	Character_isDiplomat	0x795ba0	0x796240	code		yes	0x60a60
+B	LabelSite_LeaderContent	0x5d6e06	0x5d7466	code		no	
+B	LabelSite_LeaderPanel	0x720bb5	0x721215	code		no	
+B	LabelSite_DipContent	0x5d71aa	0x5d780a	code		no	
+B	LabelSite_DipPanel	0x720b8d	0x7211ed	code		no	
+B	Data_MaxFactionSize	0x2132e80	0x2133f50	ref	0x7ff91b	no	
+B	Data_RobotWearRate	0x2132d84	0x2133e54	ref	0x64f4ae	no	
+B	ZoneManager_updateFeatureGroups	0xa09020	0xa098e0	code		yes	0x1fdaf0
+B	Data_FeatureCamera	0x2132240	0x2133310	ref	0xa098ff	no	
+B	Data_FeatureRange	0x2132450	0x2133520	ref	0xa0993a	no	
+B	ZoneManager_activateZone	0xa0e7c0	0xa0f080	code		yes	0x1fc470
+B	ZoneManager_stepLoading	0xa0ef60	0xa0f820	code		yes	0x1fc470
+B	RagdollBody_translate	0x7d1a80	0x7d2120	code		no	
+B	RagdollBody_update	0x7d3560	0x7d3c00	code		no	
+B	Gui_TakeCertain	0x70ebe0	0x70f240	code		yes	0xbeda20
+B	BuildMode_getSingleton	0x2966b0	0x296d10	code		no	
+B	BuildMode_open	0x4e5f80	0x4e65e0	code		no	
+B	BuildMode_startPlacing	0x4e1000	0x4e1660	code		no	
+B	BuildMode_cancel	0x4d3cc0	0x4d4320	code		no	
+B	BuildMode_update	0x4e2180	0x4e27e0	code		yes	0x91e2f0
+B	BuildMode_confirm	0x4dab20	0x4db180	code		no	
+B	ConstructionState_addMaterial	0x549d40	0x54a3a0	code		yes	0x91e2f0
+B	PreviewBuilding_updateTown	0x4db3e0	0x4dba40	code		yes	0x91e2f0
+B	PreviewBuilding_partInPlace	0x4d6360	0x4d69c0	code		yes	0x91e2f0
+B	TownManager_nearestTown	0x927650	0x927f10	code		yes	0x91e2f0
+B	TownManager_townAt	0x927fd0	0x928890	code		yes	0x91e2f0
+B	PlayerInterface_buildingPlaced	0x4d32b0	0x4d3910	code		yes	0x91e2f0
+B	NavMesh_rebuildArea	0x3a6060	0x3a66c0	code		no	
+B	NavMesh_addInterior	0x3ab8c0	0x3abf20	code		no	
+B	NavMesh_zoneReady	0x3ac2f0	0x3ac950	code		no	
+B	NavMesh_regenerateZone	0x3ab1e0	0x3ab840	code		no	
+B	Physics_isIdle	0x173eb0	0x173fb0	code		no	
+B	BuildMode_queueInterior	0x4d2770	0x4d2dd0	code		no	
+B	OrdersReceiver_removePersonalGoalKind	0x506d30	0x507390	code		no	
+B	OrdersReceiver_hasPersonalGoalKind	0x506de0	0x507440	code		no	
+B	Building_isPlayerFaction	0x546770	0x546dd0	code		yes	0xba3de0
+B	Research_buildingUpgrades	0x82e5d0	0x82ec70	code		yes	0xba3de0
+B	Building_onClicked	0x54fe40	0x5504a0	code		no	
+B	ForgottenGUI_openBuildingInventory	0x6e60d0	0x6e6640	code		no	
+B	ForgottenGUI_refreshOrdersPanel	0x6e19f0	0x6e2050	code		no	
+B	GateSite_PersonalGoalsPlayer	0x6216a3	0x621d03	code		no	
+B	GateSite_MachineUsersCleanup	0x29a7d4	0x29ae34	code		no	
+B	GateSite_SlaverCages	0x8dadea	0x8db6aa	code		no	
+B	GateSite_BandageKitDrain	0x6495de	0x649c3e	code		no	
+B	GateSite_SeenAllyEvent	0x8591e7	0x859887	code		no	
+B	GateSite_SeenTrespass	0x859543	0x859be3	code		no	
+B	GateSite_SeenHostile	0x859816	0x859eb6	code		no	
+B	GateSite_SeenHostileIdle	0x85991c	0x859fbc	code		no	
+B	GateSite_NoticePlayer	0x857bfc	0x85829c	code		no	
+B	GateSite_Shoo	0x852024	0x8526c4	code		no	
+B	GateSite_NestNearPlayer	0x8f813e	0x8f89fe	code		no	
+B	Pop_SpawnWorldSquad	0x57ee60	0x57f4c0	code		yes	0xa358c0
+B	Pop_SpawnAreaSquad	0x8f77a0	0x8f8060	code		yes	0xa358c0
+B	Pop_SpawnNestSquad	0x8f7e80	0x8f8740	code		yes	0xa358c0
+B	GateSite_NearestPlayerTown	0x9275d4	0x927e94	code		no	
+B	GateSite_BuildingClickWindow	0x54ff25	0x550585	code		no	
+B	DoorStuff_toggleLock	0x546a00	0x547060	code		yes	0xcdf510
+B	PatchSite_PreUpdateTickTime	0x5cf748	0x5cfda8	code		no	
+B	Character_ownerships	0x795000	0x7956a0	code		no	
+B	ShopTrader_construct	0x952f90	0x953850	code		yes	0x881e40
+B	Gui_RClickAutoTrade	0x7136c0	0x713d20	code		yes	0x881e40
+B	Gui_PlaceItemFromMouse	0x714f00	0x715560	code		yes	0x881e40
+B	Bounty_payOnCaging	0x3306f0	0x330d50	code		yes	0xba3de0
+B	Dialogue_applyLineEffects	0x67ff00	0x680560	code		no	
+B	Data_InventoryWindowPairs	0x2131b10	0x2132be0	ref	0x70ff1f	no	
+B	Dialogue_checkCondition	0x6762f0	0x676950	code		yes	0xba3de0
+B	Dialogue_startPlayerConversation	0x683cc0	0x684320	code		yes	0xba3de0
+B	Perception_stealthFrame	0x858030	0x8586d0	code		yes	0x7c4a00
+B	Character_isWithPlayer	0x856520	0x856bc0	code		no	
+B	BountyLedger_beginCrime	0x8525e0	0x852c80	code		no	
+B	Character_appearanceVisible	0x52c3a0	0x52ca00	code		yes	0xba3de0
+B	AppearanceAnimal_buildBody	0x53a080	0x53a6e0	code		yes	0xba3de0
+B	InventoryGUI_inTradeRange	0x70cc30	0x70d290	code		yes	0xba3de0
+B	Character_attemptTheft	0x794170	0x794810	code		yes	0xba3de0
+B	Task_BruteForceLock_finish	0x3525f0	0x352c50	code		no	
+B	Task_CutLock_finish	0x359920	0x359f80	code		yes	0x82a6c0
+B	LockData_tryPick	0x2977f0	0x297e50	code		yes	0x82a6c0
+B	MedicalSystem_beingEaten	0x64fd10	0x650370	code		yes	0xba3de0
+B	Dialogue_addPackage	0x67f450	0x67fab0	code		no	
+B	Trade_openFromDialogue	0x951c30	0x9524f0	code		no	
+B	ForgottenGUI_closeAllInventoryWindows	0x6e50e0	0x6e5740	code		no	
+B	Economy_recordPrice	0x896560	0x896e20	code		no	
+B	MainListener_frameRenderingQueued	0x82a5d0	0x82ac70	code		yes	0x8ba980
+B	Data_FrameDt	0x21326c4	0x2133794	ref	0x82aeca	no	
+B	Medical_needScore	0x643640	0x643ca0	code		yes	0xc010d0
+B	Inventory_writeSave	0x747150	0x7477f0	code		yes	0xbde230
+B	Appearance_partLoaded	0x5369c0	0x537020	code		yes	0x29210
+B	Appearance_ctor	0x530210	0x530870	code		yes	0x29210
+B	Appearance_dtor	0x531c10	0x532270	code		yes	0x29210
+B	RL_destroyMovableNow	0x44a200	0x44a860	code		yes	0x29210
+B	World_destroyMovableLater	0x79a0e0	0x79a780	code		yes	0x29210
+B	RL_requestEntity	0x449a70	0x44a0d0	code		yes	0x29210
+B	RL_cancelRequest	0x448f80	0x4495e0	code		yes	0x29210
+B	ActivePlatoon_formationSlot	0x26fd90	0x2703f0	code		yes	0x1ee90
+B	RL_requestDtor	0x447f70	0x4485d0	code		yes	0x29210
+B	RL_cancelInFlight	0x447a60	0x4480c0	code		yes	0x29210
+B	Data_ResourceLoader	0x2126c00	0x2127c00	ref	0x6dfb0	no	
+B	Building_partVisible	0x55e0e0	0x55e740	code		yes	0xc4820
+B	BuildingInterior_unload	0x54aad0	0x54b130	code		yes	0xc4820
+B	AIPackage_fromTemplate	0x270fc0	0x271620	code		no	
+B	CharMovement_refreshPickHull	0x661410	0x661a70	code		yes	0x20c80
+B	CharMovement_dropPhysics	0x65f7e0	0x65fe40	code		yes	0x20c80
+B	PhysicsActual_createHull	0x4cc4f0	0x4ccb50	code		yes	0x20c80
+B	Havok_aiWorldStep	0xd28fb0	0xd29870	code		yes	0x1eeea0
+B	PhysicsActual_destroyCallSite	0x4cc3c6	0x4cca26	code		no	
+B	PhysicsHullT_queueDestroy	0x4cc640	0x4ccca0	code		yes	0x20c80
+B	PhysicsThreadedBase_queueDestroy	0x7dc610	0x7dccb0	code		yes	0x20c80
+B	ScytheRootObject_queueDestroy	0x7dc5b0	0x7dcc50	code		yes	0x20c80
+B	StaticBoxEntity_queueDestroy	0x7dc670	0x7dcd10	code		yes	0x20c80
+B	Item_destroyPhysical	0x75d550	0x75dbf0	code		yes	0x20c80
+B	ScythePhysicsT_queueDestroy	0x7dc420	0x7dcac0	code		yes	0x20c80
+B	FarmBuilding_destroyPhysical	0xe5e80	0xe5ea0	code		yes	0x20c80
+B	TownBase_physicsVf20	0x9332d0	0x933b90	code		yes	0x20c80
+B	PhysicsActual_mainThreadSync	0x4cd470	0x4cdad0	code		yes	0x20c80
+B	Physics_queueCreateOf	0xf1650	0xf1670	code		yes	0x20c80
+B	Physics_createPusherA	0x7e2a30	0x7e30d0	code		yes	0x20c80
+B	Physics_createPusherB	0x7e4830	0x7e4ed0	code		yes	0x20c80
+B	Physics_createPusherC	0x7e6dc0	0x7e7460	code		yes	0x20c80
+B	Physics_createPusherD	0x4cd8f0	0x4cdf50	code		yes	0x20c80
+B	Physics_createPusherE	0xdfb60	0xdfb80	code		yes	0x20c80
+B	Physics_createPusherF	0x399460	0x399ac0	code		yes	0x20c80
+B	Physics_createPusherG	0x762040	0x7626e0	code		yes	0x20c80
+B	Physics_rayConstruct	0x4cc6a0	0x4ccd00	code		yes	0x20c80
+B	Physics_queueRayDelete	0x4cc840	0x4ccea0	code		yes	0x20c80
+B	ActivePlatoon_checkInLoadedZone	0x4fe570	0x4febd0	code		no	
+B	ZoneMap_innerBounds	0xa08eb0	0xa09770	code		yes	0xb78d50
+B	ActivePlatoon_setLeader	0x791100	0x7917a0	code		no	
+B	ZoneMapContent_deactivate	0x9fe0c0	0x9fe980	code		yes	0x1535b0
+B	ZoneMapContent_loadZoneFile	0x9ff210	0x9ffad0	code		yes	0x1535b0
+B	Character_destructor	0x622420	0x622a80	code		yes	0xbd7290
+B	AIPackage_buildRoleGoals	0x26b130	0x26b790	code		yes	0x23ad0
+B	Item_stackLimit	0x75d9f0	0x75e090	code		no	
+B	NavMesh_updateGates	0x2eee40	0x2ef4a0	code		yes	0x1eeea0
+B	AnimationClass_ragdollSafeTick	0x5b7b20	0x5b8180	code		yes	0xba3de0
+B	ZoneMap_deactivate	0xa09c30	0xa0a4f0	code		yes	0x1eeea0
+B	Data_Dismemberment	0x2132434	0x2133504	ref	0x64f409	no	
+B	TownBuildingsManager_clear	0x92eb10	0x92f3d0	code		no	
+B	Building_nearestEntrance	0x54b1f0	0x54b850	code		yes	0x1ee90
+B	Building_hasFreeEntrance	0x54bf60	0x54c5c0	code		yes	0x1ee90
+B	Building_markEntranceBlocked	0x54cdb0	0x54d410	code		yes	0x1ee90
+B	GateCodes_rebuildMaps	0x2ee550	0x2eebb0	code		yes	0x1ee90
+B	GateCodes_doorChanged	0x2ecb60	0x2ed1c0	code		yes	0x1ee90
+B	GateCodes_nearestGate	0x2eb770	0x2ebdd0	code		yes	0x1ee90
+B	GateCodes_pairState	0x2eaa10	0x2eb070	code		yes	0x1ee90
+B	GateCodes_pairHops	0x2eaab0	0x2eb110	code		yes	0x1ee90
+B	BashDoor_neighbourInWay	0x33d030	0x33d690	code		yes	0x1ecd0
+B	Data_PopulationMult	0x2132408	0x21334d8	ref	0x8f8702	no	
+B	Data_SquadSizeMult	0x213240c	0x21334dc	ref	0x584207	no	
+B	Data_RaidSizeMult	0x2132410	0x21334e0	ref	0x9c5b38	no	
+B	Data_RaidFreqMult	0x2132414	0x21334e4	ref	0x9c5a85	no	
+B	Economy_vendorListCache	0x37d780	0x37dde0	code		no	
+B	VendorListCache_get	0x9589e0	0x9592a0	code		no	
+B	VendorList_generate	0x954d10	0x9555d0	code		no	
+B	Ownerships_setHomeTown	0x7ec230	0x7ec8d0	code		no	
+B	Ownerships_addOwnedBuilding	0x7ec460	0x7ecb00	code		no	
+B	Ownerships_removeOwnedBuilding	0x7eba50	0x7ec0f0	code		no	
+B	Zones_spatialQuery	0x9fe950	0x9ff210	code		yes	0x1ee90
+B	ZoneGrid_moveObject	0x9fe890	0x9ff150	code		yes	0x1ee90
+B	ZoneGrid_addObject	0x9fe700	0x9fefc0	code		yes	0x1ee90
+B	ZoneGrid_removeObject	0x9fe7f0	0x9ff0b0	code		yes	0x1ee90
+B	NavMesh_gatesTowns	0x2edfa0	0x2ee600	code		yes	0x1eeea0
+B	TownList_update	0x92cf90	0x92d850	code		yes	0x1eeea0
+B	Phys_rayDown	0x9b3110	0x9b39d0	code		yes	0x1eeea0
+B	LightBuilding_rayDownCall	0x297b18	0x298178	code		no	
+B	PatchSite_TownZoneLoad	0x36fa31	0x370091	code		no	
+B	TownList_mergeTowns	0x930f80	0x931840	code		yes	0xba3de0
+B	Platoon_declareDead	0x7969f0	0x797090	code		yes	0x531da0
+B	UniqueNPC_instance	0x1c841	0x1c84b	ref	0x58385f	no	
+B	UniqueNPC_entry	0x2d1eb	0x2d19b	ref	0x592264	no	
+B	Pop_CreateRandomSquad	0x5833b0	0x583a10	code		yes	0xa358c0
+B	Factory_spawnBuildingResidents	0x57f1c0	0x57f820	code		no	
+B	Pop_SpawnResidentSquads	0x9fc460	0x9fcd20	code		yes	0xa358c0
+B	ActivePlatoon_restockTrader	0x4fef80	0x4ff5e0	code		yes	0x1b9ad0
+B	TownBuildings_setFloor	0x92a430	0x92acf0	code		no	
+B	TownBuildings_applyFloors	0x929af0	0x92a3b0	code		no	
+B	TownBuildings_floorOf	0x92b6b0	0x92bf70	code		yes	0xcc5f30
+B	DatapanelGUI_addLine	0x6ff220	0x6ff880	code		no	
+B	SaveManager_execute	0x47bcb0	0x47c310	code		yes	0x193d0
+B	SaveManager_saveGame	0x374d00	0x375360	code		yes	0x193d0
+B	FactionSaveRecord	0x372400	0x372a60	code		yes	0x193d0
+B	ZonesSaveLive	0x36ddf0	0x36e450	code		yes	0x193d0
+B	ZoneContentSave	0x36d780	0x36dde0	code		no	
+B	GameDataContainer_saveToFile	0x6bcf10	0x6bd570	code		yes	0x193d0
+B	RagdollPartSetVelocities	0x1a98a0	0x1a9f00	code		yes	0x19810
+B	Package_HangAroundBar_seatFor	0x293840	0x293ea0	code		yes	0x8ee8a0
+B	GameCamera_update	0x6b0930	0x6b0f90	code		yes	0x8a960
+B	Town_pickResidentBuilding	0x92dfb0	0x92e870	code		yes	0x81c8a0
+B	Town_settleResidentBuilding	0x92dbf0	0x92e4b0	code		no	
+B	Town_cultureMult	0x92b600	0x92bec0	code		no	
+B	Town_tradeGoodsMult	0x92ccd0	0x92d590	code		no	
+B	TaskBrain_plan	0x50f7b0	0x50fe10	code		yes	0x80a310
+B	TaskBrain_planSearch	0x50f1a0	0x50f800	code		yes	0x80a310
+B	Tasker_rate	0x60f720	0x60fd80	code		yes	0x80a310
+B	AI_checkPreconditions	0x60f2e0	0x60f940	code		yes	0x80a310
+B	Data_StateSymbols	0x1ea8350	0x1ea9350	ref	0x6101c9	no	
+B	Building_lightsNear	0x549a10	0x54a070	code		yes	0x72e5f0
+B	LightEnt_levelAt	0xa084e0	0xa08da0	code		yes	0x72e5f0
+B	LightBuilding_isActive	0x297230	0x297890	code		yes	0x72e5f0
+B	Phys_roofAbove	0x9b6b70	0x9b7430	code		no	
+B	MedicalSystem_acidRainTick	0x646c60	0x6472c0	code		yes	0x7bf3d0
+B	Data_DamageResistMax	0x2132d34	0x2133e04	ref	0x650ede	no	
+B	Data_DamageResistMin	0x2132d30	0x2133e00	ref	0x650ede	no	
+B	Data_GlobalDamageMult	0x21324b0	0x2133580	ref	0x650f6b	no	
+B	MedicalSystem_acidWaterTick	0x646620	0x646c80	code		yes	0x7bf3d0
+B	MedicalSystem_acidGroundTick	0x6469b0	0x647010	code		yes	0x7bf3d0
+B	Dialogue_endConversation	0x6741d0	0x674830	code		no	
+B	BuildingItemGroup_spawnItem	0x547870	0x547ed0	code		yes	0xbdee80
+B	Inventory_sellItemTo	0x74a050	0x74a630	code		yes	0x8f0320
+B	Package_WanderingTrader_pickTown	0x2860e0	0x286740	code		yes	0x8f0320
+B	TownManager_chooseTown	0x92bd20	0x92c5e0	code		yes	0x8f0320
+B	BuildingInterior_addFurniture	0x54ed70	0x54f3d0	code		no	
+B	Task_orderPatrolAround	0x5c64d0	0x5c6b30	code		yes	0x8f51c0
+B	DialogLineData_load	0x67aa10	0x67b070	code		no	
+B	DialogLineData_linkReferences	0x67cc00	0x67d260	code		no	
+B	Data_DialogLineMapSize	0x1ef7c70	0x1ef8c70	ref	0x6ad8a0	no	
+B	GateSite_ReloadPlayerAmmo	0x437752	0x437db2	code		no	
+B	HarpoonManager_spawn	0x439c90	0x43a2f0	code		yes	0x801a80
+B	FarmBuilding_climateYield	0xdfdf0	0xdfe10	code		yes	0x72e320
+B	DialogueWindow_setSpeaker	0x722890	0x722ef0	code		yes	0xcc7660
+B	ForgottenGUI_isDialogueOpen	0x6e1bb0	0x6e2210	code		no	
+B	NavMesh_gatesApply	0x2efd80	0x2f03e0	code		yes	0x1eeea0
+B	LocationNode_create	0x57c200	0x57c860	code		no	
+B	NodeList_remove	0x389f40	0x38a5a0	code		no	
+B	MedicalSystem_updateBleeding	0x645ae0	0x646140	code		yes	0xc010d0
+B	Data_MedicSpeed	0x2132d58	0x2133e28	ref	0x64d8cd	no	
+B	FarmBuilding_plantScale	0xdf340	0xdf360	code		no	
+B	FarmBuilding_plantsToShader	0xe4520	0xe4540	code		no	
