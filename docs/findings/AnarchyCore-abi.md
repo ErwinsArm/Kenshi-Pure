@@ -93,6 +93,9 @@ AnarchyKenshi.dll was read, `ak_decomp.c`). RVAs below are of the export body.
 | | `ReportSend/State/Status` | `1cc50`, `1ce40`, `1cec0` | see D |
 | Misc | `AnarchyAbiVersion`, `AnarchyProtocolVersion`, `AnarchyCoreVersion` | `13ae0`, `13af0`, `13b00` | () -> 95, 133, version string |
 
+Each `...Fresh` export is (client) -> bool: a byte set when that batch arrives (e.g. EngageFresh
+reads client+0x440; StructuresFresh also clears it).
+
 Each `...At` export returns 0 when `i` is out of range; the `Take...` exports pop one queued item
 (ring buffers at `client+0x8a8...` for Kit etc.; Kit queue size 0x400) and return 0 when empty.
 Ghidra's parameter counts for `At` functions are as shown in `sigs`; sizes were not re-verified

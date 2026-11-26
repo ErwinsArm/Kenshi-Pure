@@ -6,6 +6,15 @@
 - Source of evidence: Ghidra 12.2 pseudocode of `.text` `0x1000`–`0x40000`, `llvm-objdump`
   disassembly of the whole file, strings and exports. Everything is static; nothing was run and
   no server was contacted.
+- Field meanings marked "AK" come from `AnarchyKenshi.dll` v0.133.1 (SHA-256
+  `c3d2419d1c02b516552032e9037d29ec1a1b88661199ddac7775f601d97b51bb`, image base `0x180000000`,
+  RVAs prefixed `AK`): its client code that fills or reads a Core export, and its host-mode code
+  that feeds the `AnarchyHost*` calls (present in AK although the shipped Core stubs them, so the
+  hop from a host call to the wire is never seen: *inferred*). Kenshi offsets and functions are
+  for the Steam `kenshi_x64.exe` (SHA-256 `a596ab4e…aeb1`, see [hooks.md](hooks.md)); "site
+  table A n" is the 0-based row n of table A in [kenshi-sites.tsv](kenshi-sites.tsv). AK imports
+  OgreMain by ordinal; ordinals were resolved against the Steam `OgreMain_x64.dll` (SHA-256
+  `7d3888d21398647519f10a89b1f300d8606f761ad159e6021a797b1b9b3df5f6`).
 - Ghidra names (`FUN_…`) and its parameter types are guesses. Where a float is passed in an XMM
   register Ghidra shows it as `uint`; checked in disassembly where it matters (see SendPosition).
 - This is the **player build**: all 192 `AnarchyHost*` exports and `AnarchyCoreCanHost` are
@@ -313,7 +322,8 @@ the last Redirect named.
 serverPasswordProof, newStoredKey, newServerKey (empty when not used). Section 3.
 
 **Welcome `02`** (`0x2bf70`): `u8 02`, `u32 playerId`, `str16 serverName` (≤64), `u16 tick`
-(printed as ", tick N"; meaning *inferred*), `u32 mainCharacterEntity` (0 = none),
+(only formatted into the log line ", tick N" at `0xeb6d`, never stored: *measured*; what the server
+puts there is *unknown*), `u32 mainCharacterEntity` (0 = none),
 `u8 characterOnFileBeingRebuilt`.
 
 **Reject `03`** (`0x2c1f0`): `u8 03`, `u8 reason`, `str16 text` (≤512). Reasons (`0x29c40`):
@@ -323,7 +333,9 @@ serverPasswordProof, newStoredKey, newServerKey (empty when not used). Section 3
 
 **Redirect `43`** (`0x2c3f0`): `u8 43`, `u8 kind` (0 "your character is there", 1 "crossing
 over", 2 "signing in at the gate"), `str16 host` (≤253, only `[A-Za-z0-9.:-]`), `u16 port`
-(≠0), `str16 region` (≤32), `str16 ticket` (≤ `0xc000`), `u32` (meaning unknown). At most 5
+(≠0), `str16 region` (≤32), `str16 ticket` (≤ `0xc000`), `u32` (parsed to struct+0x70 at `0x2c750`,
+then never read by the dispatcher or any export: the client ignores it, *measured*; meaning
+*unknown*). At most 5
 redirects per 60 s; a ticket without a 32-byte region key is refused. The client then
 disconnects and reconnects to `host:port` on the next `AnarchyClientUpdate`.
 
@@ -332,8 +344,39 @@ the client fills in its own id from Welcome; 0 = server), `str16 text` (≤256).
 starting with `"[Admin] "` from id 0 is shown as admin.
 
 **Position `0b`** (`0x2b890`): `u8 0b`, `f32 × 6`, `u8 bool`, `f32 × 6`, `u8`, `u8` (52 bytes).
-Non-finite floats become 0; the export refuses to send if any of the 12 is non-finite. Meaning of
-the fields is not known yet (the export passes them straight through).
+Non-finite floats become 0; the export refuses to send if any of the 12 is non-finite. Core passes
+the arguments straight through (order *measured* from the AK call `AK 0x2f65bf` via wrapper
+`AK 0x5b400`, which also normalises the bool). Meanings from AK: client sources *measured*
+(sender `AK 0x2f5a30`); "server use" is AK host-mode code (`AK 0x3d2660`) reading
+`TakePlayerMove` out-parameters, assumed to be in wire order (*inferred*: the host export is a stub;
+the slot types fit, e.g. the bool in slot 7 is tested at `AK 0x3d294a`); names *inferred*:
+
+| # | Field | Client source | Server use |
+|---|---|---|---|
+| 1–3 | position x, y, z | `Character_positionDirect` (site table A 138) | per-player position map `AK 0x195fc40` |
+| 4–6 | destination x, y, z | copy of position, overwritten from movement (`char+0x640`) `+0xe8`; reset to position in furniture or inside a zone (`AK 0x567fe0`), the reset only when config byte `AK 0x15a69a5` is set | stored as the move intent (`AK 0x3dd8f0`) when 7 is set and bit `0x04` clear |
+| 7 | walking (bool) | xz distance² position→destination > 4.0 (`AK 0x2f6048`) | keeps or clears the move intent |
+| 8 | wanted speed | movement `+0xb8` | if > 0.1: `AbstractMovementBase_wantSpeed` with min(v, top speed) (`AK 0x3d4064`) |
+| 9–11 | motion vector (velocity) | `AbstractMovementBase_motionNow` (A 12) | stored in map `AK 0x195f860` (further use not traced) |
+| 12–13 | facing x, z | the orientation's rotated local **+Z** axis `(2(wy+xz), 1−2(x²+y²))` (`AK 0x2f6110`–`0x2f6195`; not Ogre's −Z `getDirection`), from `RootObject_orientationDirect` (A 322), normalised in xz, default (1, 0) | stored as (x, 0, z) in `AK 0x195ff68` |
+| 14 | state bits | built at `AK 0x2f6481`–`0x2f6527`, see below | see below |
+| 15 | floor | max(0, `Character+0xa4`) | setter `AK 0x2c4340` if changed; feeds the snapshot floor |
+
+State bits (field 14; client sources *measured*, names *inferred*): `0x01` sneaking
+(`Character_isSneaking`); `0x02` shackled (`Character_isShackled`); `0x04` the server leads this
+body (globals `AK 0x1945ec0`/`0x1945ec1`, log "slave: the server leads our own body now"; which
+global is which mode is not traced; the server then skips the move intent); `0x08` pose upright
+(Character vtable `+0x368`, pose names `AK 0x1201678`: upright, low, crawling, playing dead, KO);
+`0x10` standing idle (`0x08`, not walking, globals `AK 0x1945ec0/ec1/ee9` clear, callee
+`AK 0x2d6af0` false; "no AI task, not carrying" is *inferred*); `0x20` down and cannot rise
+(playing dead/KO, ragdoll, and the original `Character_safeToRise` called at `AK 0xc00fb0` returns
+false; only when config byte `AK 0x15a695b` is set, tested by client `AK 0x2c1f40` and server
+`AK 0x3d2cc1`; the server puts the copy in a 128-slot table `AK 0xc00fe0` whose slots expire after
+12000 ms). Server-side use is seen only for `0x04`, `0x10` (stored at per-player record +0x38)
+and `0x20`; `0x01`, `0x02`, `0x08` are named from the client side only.
+`Character+0xa4` (floor), movement `+0xe8`/`+0xb8` have no Kenshi name yet. The OgreMain import
+in the sender (`AK` IAT `0xeb0278`) is ordinal 1839 = `Ogre::Vector3::operator=` (resolved against
+the Steam OgreMain export table): a plain copy.
 
 **Snapshot `05`** (`0x2a0d0`):
 
@@ -352,11 +395,25 @@ count x entity:
   i16 dy, i16 dz      else position = origin + d / 8   (0.125 units)
   i16 vx, vy, vz      velocity = v / 64
   u16 dir             low 13 bits: angle = n * 2*pi / 8190 (0x1fff = none),
-                      high 3 bits: per-entity flags/state (meaning unknown)
+                      high 3 bits: floor index 0..7 (decoded `dir >> 13` at 0x2a6de)
 ```
 
-Decoded entity is 40 bytes (`id, x, y, z, vx, vy, vz, dirA, dirB, flags`); `dirA`/`dirB` are
-two trig functions of the angle (`0x5ee10`, `0x5f390`; which is sin and which cos is not checked).
+Decoded entity is 40 bytes (`id, x, y, z, vx, vy, vz, dirA, dirB, floor`); `dirA`/`dirB` are
+the facing vector's x and z: the AK client stores `dirA` at entity record +0x170 and `dirB` at
++0x178 with +0x174 = 0 (`AK 0x4fe4c4`–`0x4fe4d3`, *measured*), and the server record
+(`AK 0x429af0`, 0x2c B each) holds facing x at +0x1c and z at +0x24. `0x5ee10` is sin and
+`0x5f390` cos (*inferred* from their small-argument paths), so an encoder must send
+θ = atan2(x, z), n = round(θ·8190/2π) mod 8190, `0x1fff` = no facing (decode at `0x2a6c0`–`0x2a739`).
+
+The high 3 bits are a **building floor** (both ends *measured*, the server→wire hop *inferred*
+since the encoder is in the stubbed Core; the name *inferred* from logs
+`" floor="`, `" building="`, "a body indoors carries its floor with it"). Server: record +0x28 =
+the player's floor from Position field 15 (map `AK 0x195f768`), else `Character+0xa4` via
+`AK 0x2c4320`, clamped ≥ 0. Client: `AK 0x4fdd50` keeps it per entity (value +0x228, i.e. map node +0x248); `AK 0x502241`
+copies it into the local body's `Character+0xa4` (setter `AK 0x4fb800`, behind a config byte);
+the remote-body ground walk (`AK 0x502f90`) does not walk a body whose floor is above 0 but places
+it (`AK 0x4f9440`). How floors ≥ 8 are encoded is *unknown* (the server encoder is in the stubbed
+Core).
 
 **Spine** (opaque channel for AnarchyKenshi.dll): client→server `3e` (`0x2d550`): `u8 3e`,
 `u16 kind`, `str16 blob` (≤ `0x2000`; the export refuses >`0x2000` or kind ≥ `0x10000`).
@@ -366,8 +423,20 @@ Server→client `3d` (`0x2d350`): `u8 3d`, `u16 kind` (*inferred* from the share
 ### Server→client layouts
 
 Common frame (measured, every parser): `u8 id`, whole message <= `0x10000`; payload must be
-consumed exactly. "head" = a `u32` stored as the first field of the parser's output struct; its
-meaning is not visible in the parsers (*unknown*; the client keeps it with the batch). A header of
+consumed exactly. "head" = a `u32` stored as the first field of the parser's output struct; the
+client discards it: dispatcher `0xe340` copies only the entry vector of each batch into the client
+object (e.g. Engage at `0x1125d`–`0x11270`), no export returns it, and the `...Fresh` exports only
+read a "batch arrived" byte (*measured*). In host mode AK passes the game clock in ms
+(`(u32)` of the double at `AK 0x1945d90`, advanced at `AK 0x429e22` by tick period × 1000 × speed;
+the period at `AK 0x15a69b0` is 1/configured rate, default 0.1) to 17 of the 21
+`AnarchyHostBegin<X>` call sites (e.g. `AK 0x38e6f0`, `0x2b3211`, `0x42dee4`). Exceptions:
+`BeginDespawns`/`BeginCensus` get no clock (their messages have no head); `BeginStructures`,
+`BeginDoors`, `BeginCrates` are never called; `BeginKits` gets the clock although Kit `17` has no
+head (unexplained).
+`BeginSnapshot(host, tick, clock, speed)` at `AK 0x42e5ae` and `BeginAnims(host, clock,
+fingerprint)` match their wire order, so head = the server's game time in ms when the batch was
+built, the same for all batch types and equal to Snapshot `gameTimeMs` of that tick (*inferred*:
+Core's host builders are stubs). Since the client ignores it, any value works for our server. A header of
 `u32 head, u16 count` is read as `size >= 6` else the parser returns false.
 
 ```
@@ -582,8 +651,8 @@ See [AnarchyCore-abi.md](AnarchyCore-abi.md).
 
 ## Open questions
 
-- Meaning of the `u32 head` shared by most batch messages, the Welcome `u16`, Redirect `u32`,
-  snapshot flag bits, Position floats.
+- What the server writes into the Welcome `u16` and the Redirect `u32` (the client ignores both);
+  Kenshi's names for `Character+0xa4` and the movement offsets used by Position.
 - Field semantics of Vitals, Hits, CombatStates, CombatAnims, Kit records, ItemMove strings (sizes are
   measured, names are guesses): readable from the AnarchyKenshi.dll code that consumes them.
 - `AnarchyClientUpdate`/`PollMessage` ABI argument counts and the argument semantics of `SpeedVotes`,
