@@ -230,8 +230,7 @@ during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may 
   without the game.
 - Fail safe: any unexpected state disables the feature and logs; never kill the game.
 
-**Your call (questions, with a recommendation)**
-Decided by the user:
+**Decided by the user**
 - Protocol: **own** (not wire-compatible with AK).
 - Builds: **Steam now; GOG is planned later** (needs a GOG exe to check RVAs).
 - Kenshi version: the user's main menu shows **"Kenshi 1.0.65 - x64 (Newland)"** with RE_Kenshi 0.3.5 and
@@ -248,10 +247,8 @@ Decided by the user:
 - VS 2022 Build Tools (C++ workload): **yes**, installed at M0 (size checked before installing; the
   user's limit is 10 GB).
 
-Still open:
-8. *Is a second PC or second person available for M6?* **Yes if possible** (two instances on one
-   PC are unproven, G9); if not, the step is declared met at M5 with the bot. A friend joins the server
-   on the user's PC over a private VPN (e.g. Tailscale or ZeroTier) or a forwarded port.
+- Second player for M6: **a friend of the user** joins the server on the user's PC over a private VPN
+  (e.g. Tailscale or ZeroTier) or a forwarded port.
 
 ## 5. Risks and when to stop
 
