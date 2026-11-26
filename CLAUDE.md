@@ -87,7 +87,10 @@ Every subagent and started session names `model` and `effort` (a hook checks).
 ## Side sessions
 
 - A long job the user asks for goes to one session whose brief carries it to the end (analysis,
-  notes, commit). Detach it right after it starts, else each report re-reads the starter's history.
+  notes, commit). Detach it right after it starts (`detach_session`; for a proposal card, on the
+  "user started your proposal" notice), else each report wakes the starter and re-reads its
+  history. Stay linked only under ~200k and when you must act on its result; over that, run a
+  foreground subagent instead. One `start_session` per message, never in parallel.
 - A handed-off job stays in its scope; anything outside it becomes a `WORK.md` line.
 - Past ~200k context (a hook warns), suggest a fresh session for new work, after the findings and
   `WORK.md` hold what it needs.

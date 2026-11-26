@@ -49,7 +49,8 @@ function noteFor(size) {
 	return (
 		`Session size: ~${Math.round(size / 1000)}k tokens (over ~${Math.round(LIMIT / 1000)}k). Each new message re-reads all of it. ` +
 		"If you haven't said so yet this session, tell the user in one line: start a fresh session for new work " +
-		"(after writing what it needs into the findings notes or a hand-over note)."
+		"(after writing what it needs into the findings notes or a hand-over note). " +
+		'Detach side sessions you start (CLAUDE.md "Side sessions").'
 	);
 }
 
