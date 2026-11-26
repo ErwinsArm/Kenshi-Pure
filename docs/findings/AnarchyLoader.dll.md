@@ -1,12 +1,18 @@
 # AnarchyLoader.dll
 
-- File: `AnarchyLoader.dll`, mod v0.103.2, 38 400 bytes,
-  SHA-256 `0d7c25887f11b1c27020a7ef5e39927a6c45bbb50caa8b66eab1d139ce347c69`.
+- File: `AnarchyLoader.dll`, 38 400 bytes in both versions below.
+  - v0.133.1 (in the repo): SHA-256 `a05816a8b44dd28c13ea77a3d65b0fe76fc149b6d6af8f41c427cd68ec94ab5f`.
+  - v0.103.2 (analysed in Ghidra; in git history up to b89dee5): SHA-256
+    `0d7c25887f11b1c27020a7ef5e39927a6c45bbb50caa8b66eab1d139ce347c69`.
+  - The two differ in 18 bytes only: PE TimeDateStamp (file offset `0x100`), PE CheckSum
+    (`0x150`), export-directory timestamp (`0x8204`) and the version resource (`0x8ed0`–`0x91dc`,
+    "0.103.2" → "0.133.1"). Code and data are byte-identical, so everything below holds for both
+    (*measured*: `cmp -l`, header offset `e_lfanew = 0xf8`).
 - PE32+ x64 DLL, image base `0x180000000`. All addresses below are RVAs.
 - Built against the VC++ 2010 runtime (imports `MSVCR100.dll`, `MSVCP100.dll`), the same runtime
   Kenshi uses (*measured*: import table; Kenshi's runtime *inferred*).
 - Version resource: "Kenshi Multiplayer - starts the mod as an Ogre plugin", FileVersion 0.103.2,
-  CompanyName "Anarchy" (*measured*: strings).
+  CompanyName "Anarchy" (*measured*: strings; 0.133.1 in the newer file).
 - No TLS callbacks, no load-config directory (*measured*: REA `inspect_pe_load_config`).
 
 ## Role
@@ -90,18 +96,20 @@ open mode `8` = `ios::app` in MSVC, *inferred* from the constant) as
 
 - Loader → `AnarchyPreload.dll` (optional), `AnarchyLauncher.dll`, `AnarchyKenshi.dll`, all by
   `LoadLibraryA` at runtime; none in its import table (*measured*).
-- `AnarchyLauncher.dll` (SHA-256 `037b7cdb…b7bb`) exports `launcherInstall` and contains the
-  strings `AnarchyKenshi.dll`, `AnarchyCore.dll`, `AnarchyLoader.dll` (*measured*: string grep).
-  Its imports point at a custom window UI (USER32/GDI/GDI+ drawing, layered window), HTTP
-  (WinHTTP), file replace/delete (`MoveFileExW`, `DeleteFileW`), reading an INI-style config
-  (`GetPrivateProfileStringA`, likely `AnarchyKenshi.cfg`) and code patching (`VirtualProtect`,
-  `FlushInstructionCache`) (*measured*: imports; purposes *inferred*). Likely a pre-game
-  launcher / server browser / updater; not analysed yet.
+- `AnarchyLauncher.dll` contains `launcherInstall` and the strings `AnarchyKenshi.dll`,
+  `AnarchyCore.dll`, `AnarchyLoader.dll` (*measured*: string grep, both versions). Its v0.103.2
+  import table (SHA-256 `037b7cdb…b7bb`) points at a custom window UI (USER32/GDI/GDI+ drawing,
+  layered window), HTTP (WinHTTP), file replace/delete (`MoveFileExW`, `DeleteFileW`), reading
+  an INI-style config (`GetPrivateProfileStringA`, likely `AnarchyKenshi.cfg`) and code patching
+  (`VirtualProtect`, `FlushInstructionCache`) (*measured*: imports; purposes *inferred*). The
+  v0.133.1 file (SHA-256 `3322a718…2efa`) still contains those API names (*measured*: string
+  grep; import table not re-read). Likely a pre-game launcher / server browser / updater; not
+  analysed yet.
 - `AnarchyCore.dll` is not referenced by the loader; its name appears in AnarchyKenshi.dll and
-  AnarchyLauncher.dll (*measured*: string grep). Whether it is a static import or loaded at
-  runtime is not checked yet.
-- `AnarchyKenshi.dll` exports `?startPlugin@@YAXXZ` (*measured*: string present; export table
-  not yet read) and also mentions `AnarchyPreload.dll`.
+  AnarchyLauncher.dll (*measured*: string grep, both versions). Whether it is a static import or
+  loaded at runtime is not checked yet.
+- `AnarchyKenshi.dll` contains `?startPlugin@@YAXXZ` (*measured*: string present, both versions;
+  export table not yet read) and also mentions `AnarchyPreload.dll`.
 
 ## Open questions
 
