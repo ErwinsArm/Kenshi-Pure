@@ -10,5 +10,6 @@ Mod in the repo: AnarchyKenshi v0.133.1. One file per binary or topic; each note
 | [hooks.md](hooks.md) | (v0.133.1) How AnarchyKenshi.dll finds Kenshi code (site tables, live-image scan) and hooks it (own detour engine, gates, patches). |
 | [kenshi-sites.tsv](kenshi-sites.tsv) | (v0.133.1) The 795 Kenshi addresses from the site tables: name, GOG/Steam RVA, kind, detoured or not. |
 | [spine.md](spine.md) | (v0.133.1) The Spine sync layer: 48 topic registrations (47 classes), blob format, which state goes which way. |
+| [spine-topics.md](spine-topics.md) | (v0.133.1) Per-topic Spine layouts: server -> client rows and client -> server intent payloads for all 48 topics, shared key/primitive conventions. |
 | [AnarchyLoader.dll.md](AnarchyLoader.dll.md) | (v0.133.1; code byte-identical to v0.103.2) Ogre-plugin bootstrapper: start flow, env vars, log file, how the other DLLs are loaded. |
 | [AnarchyLauncher.dll.md](AnarchyLauncher.dll.md) | (v0.133.1) Replacement for Kenshi's start-up launcher (news, mods, settings, SP/MP switch) and the signed self-updater; no server browser. |

@@ -54,7 +54,7 @@ a{color:var(--accent)}
   <div class="stats">
     <div class="stat"><div class="n">~60</div><div class="l">network message types, layout measured</div></div>
     <div class="stat"><div class="n">795</div><div class="l">Kenshi code addresses, all matching the Steam build</div></div>
-    <div class="stat"><div class="n">5 / 48</div><div class="l">synced game areas ("Spine") decoded</div></div>
+    <div class="stat"><div class="n">48 / 48</div><div class="l">synced game areas ("Spine"): data format decoded</div></div>
     <div class="stat"><div class="n">0</div><div class="l">usable server code in the shipped package</div></div>
   </div>
 
@@ -79,7 +79,7 @@ a{color:var(--accent)}
     <div class="notes">
       <p><b>Server.</b> A multiplayer game needs a central program that every player connects to and that decides what is true in the shared world. AnarchyKenshi contains server logic inside its main DLL, but it can never run. The networking DLL that ships with it has all 192 server functions replaced by empty stubs. The mod even logs "this build has no server in it". So the server has to be written new.</p>
       <p><b>Game mod (client).</b> The part that runs inside each player's Kenshi. It hooks into Kenshi's own code: it intercepts functions like "move character" or "save game" and reports them to the server, or applies what the server says. To do that it needs to know where those functions live in the game's executable. That is the list of 795 addresses.</p>
-      <p><b>Spine.</b> The mod's name for its sync layer. It keeps 48 areas of game state in step between players: traders, squads, injuries, machines, weather, factions and more. Each area has its own data format. 5 are decoded; the rest are being decoded now.</p>
+      <p><b>Spine.</b> The mod's name for its sync layer. It keeps 48 areas of game state in step between players: traders, squads, injuries, machines, weather, factions and more. Each area has its own data format. The formats of all 48 are decoded (what the server sends, what a player's game asks for); for about half of them some server-side rules or field meanings are still open.</p>
       <p><b>Measured vs. inferred.</b> "Known" means the fact was read directly from the binary: message sizes, field order, addresses, byte patterns. What a field means is often an educated guess and is marked as such in the detailed notes.</p>
       <p class="muted">Sources: AnarchyKenshi v0.133.1 DLLs (SHA-256 recorded in the notes), Steam <code>kenshi_x64.exe</code> for Kenshi 1.0.68. Full notes: <a href="https://github.com/ErwinsArm/Kenshi-Pure/tree/main/docs/findings">docs/findings</a> in the project repository. Status as of 26 November 2026.</p>
     </div>
@@ -92,11 +92,11 @@ const NAMES={k:'Known',p:'Partly known',u:'Unknown',o:'Our choice'};
 const data={name:'All',children:[
 {name:'Server',sub:'The central program players connect to. Must be written new.',children:[
 {name:'Game-world logic',s:'u',v:14,d:'Who is right when two players act on the same thing; running the shared world. The mod has server logic, but it cannot run without a server-capable networking DLL, which was never shipped.',ev:'Server handle is set in exactly one place, only if the stubbed AnarchyCoreCanHost returns true.'},
-{name:'Spine: 43 areas',s:'p',v:12,d:'Traders, squads, injuries, machines, stores, factions, trade, mods and more. Being decoded now in a separate session.',ev:'48 topic registrations found; common header (version byte + sequence number) is known.'},
-{name:'Meaning of fields',s:'p',v:6,d:'For every message we know the size and order of each field, but not always what each field means.',ev:'Examples still open: a shared 32-bit header in batch messages, some flags in position snapshots.'},
+{name:'Spine: data formats',s:'k',v:10,d:'All 48 areas: traders, squads, injuries, machines, stores, factions, trade, mods, weather and more. For each: what the server sends and what a player\'s game asks for, field by field.',ev:'Read from the apply, gather and request handlers of every topic; spot-checked by two reviewers.'},
+{name:'Meaning of fields',s:'p',v:6,d:'For every message we know the size and order of each field, but not always what each field means.',ev:'The batch header, position fields and snapshot flags are now decoded; open meanings are mostly inside the Spine areas.'},
 {name:'Message layouts',s:'k',v:6,d:'All roughly 60 message types in both directions: hello, login, chat, positions, spawns, health, combat, inventory, doors, buildings and more.',ev:'Read from every encoder and parser in AnarchyCore.dll.'},
 {name:'World saving',s:'u',v:5,d:'How the server stores and reloads the shared world. Not visible from the client side.',ev:'Strings show world saves exist in the server code path; format not analysed.'},
-{name:'Spine: 5 areas',s:'k',v:3,d:'Rules, wallet, voting, stealth and weather are fully decoded.',ev:'From the client apply code of each topic.'},
+{name:'Spine: server rules',s:'p',v:5,d:'What the server checks before it accepts a request (for example trade prices, healing claims, faction commands). Partly read; many field meanings are educated guesses.',ev:'Refusal texts are known for most areas; several judging functions are not read yet.'},
 {name:'Connection',s:'k',v:4,d:'Uses the open-source networking library ENet 1.3.x over UDP, 5 channels, no checksum, no compression.',ev:'Library compiled in; its standard command table found in the binary.'},
 {name:'Login',s:'k',v:4,d:'Password check with SCRAM-SHA-256 (the password never leaves the PC), optional server password, and a machine fingerprint.',ev:'SHA-256, HMAC and PBKDF2 code identified by their constants.'},
 {name:'Account storage',s:'o',v:3,d:'How player accounts are stored on our server is our own decision.',ev:'The login protocol tells us what the server must keep per account.'},
@@ -108,7 +108,7 @@ const data={name:'All',children:[
 {name:'Which hooks are needed',s:'p',v:5,d:'325 is an upper bound: some hooks only matter in server mode or behind feature switches.',ev:'A real client run is needed to see which ones install.'},
 {name:'Hooking technique',s:'k',v:4,d:'How the mod redirects Kenshi functions: its own small detour engine (jump patches with trampolines), plus a few direct code patches.',ev:'Installer, limits and error messages read from the DLL.'},
 {name:'Live behaviour',s:'u',v:3,d:'What happens inside the running game, for example whether address lookups ever disagree with the table.',ev:'The player\'s own logs may be used to check this.'},
-{name:'Launcher / updater',s:'u',v:3,d:'The mod\'s start window with server browser and self-updater.',ev:'Not analysed yet.'},
+{name:'Launcher / updater',s:'k',v:3,d:'The mod\'s start window replaces Kenshi\'s launcher (news, mods, settings, single/multiplayer switch) and runs a signed self-updater. It has no server browser.',ev:'AnarchyLauncher.dll read in full.'},
 {name:'Start-up',s:'k',v:2,d:'How Kenshi loads the mod as a graphics-engine plugin and how the mod starts its parts.',ev:'Loader and start function read in full.'},
 {name:'GOG build',s:'u',v:2,d:'Addresses for the GOG version of Kenshi are present but unchecked.',ev:'No GOG executable available to compare.'}]},
 {name:'Versions',sub:'The mod keeps updating itself.',children:[
