@@ -129,5 +129,5 @@ Runtime evidence outranks critics.
    `docs/knowledge-map.html`, its date line, and republish it to the artifact; delete finished `WORK.md` entries; delete scratch files you made
    (only yours: other sessions share this checkout).
 3. Commit by path in plain English without asking: `git commit -m "<msg>" -- <files>`, never a
-   plain `git commit` (it takes what another session staged). Push only when the user says so.
+   plain `git commit` (it takes what another session staged). Then pull the newest `main` and push, without asking.
 4. Edit this file only for rules every session needs; keep it under 200 lines.
