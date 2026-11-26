@@ -52,6 +52,26 @@ h2{font-size:1.25rem}
 .have b{display:block;font-family:var(--f-display)}
 .have span{color:var(--muted);font-size:.9rem}
 .foot{color:var(--muted);font-size:.85rem}
+.mapbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;overflow-x:auto}
+#map{display:block;width:100%;min-width:640px;height:auto}
+#map .road{fill:none;stroke:var(--line);stroke-width:14;stroke-linecap:round}
+#map .road-done{fill:none;stroke:var(--done);stroke-width:6;stroke-linecap:round;opacity:.85}
+#map .dash{fill:none;stroke:var(--bg);stroke-width:2;stroke-dasharray:6 10}
+#map .node{cursor:pointer}
+#map .node circle.o{stroke-width:4;fill:var(--card);stroke:var(--todo)}
+#map .node.done circle.o{fill:var(--done);stroke:var(--done)}
+#map .node.now circle.o{fill:var(--now-bg);stroke:var(--now)}
+#map .node:focus-visible circle.o,#map .node:hover circle.o{stroke-width:6}
+#map .node.sel circle.o{stroke:var(--accent);stroke-width:6}
+#map text{font-family:var(--f-body);fill:var(--fg);font-size:13px}
+#map text.tg{font-family:var(--f-display);font-weight:700;fill:var(--accent);font-size:12px}
+#map text.ph{font-family:var(--f-display);font-weight:700;font-size:15px;fill:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+#map .pulse{fill:none;stroke:var(--now);stroke-width:3;opacity:.6;animation:pulse 2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{from{transform:scale(1);opacity:.7}to{transform:scale(2.2);opacity:0}}
+@media (prefers-reduced-motion: reduce){#map .pulse{animation:none}}
+.detail{display:grid;gap:4px;border-top:1px solid var(--line);margin-top:10px;padding:10px 6px 4px}
+.detail .t{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.detail p{margin:0;color:var(--muted);max-width:65ch}
 </style>
 
 <div class="wrap">
@@ -66,6 +86,14 @@ h2{font-size:1.25rem}
     <div class="row"><div class="k">Progress</div><div class="v"><div class="bar" id="bar" role="img"></div><div class="legend" id="count" style="margin-top:6px"></div></div></div>
   </section>
 
+  <section style="display:grid;gap:10px">
+    <h2>The route</h2>
+    <p class="lead" style="margin:0">Read it like a path from top left: green = done, orange = we are here, grey = still ahead. Tap a step for details.</p>
+    <div class="mapbox"><svg id="map" viewBox="0 0 1000 560" role="img" aria-label="Route map of all steps"></svg>
+      <div class="detail" id="detail" aria-live="polite"></div></div>
+  </section>
+
+  <section style="display:grid;gap:10px"><h2>All steps in detail</h2></section>
   <section id="road" style="display:grid;gap:28px"></section>
 
   <section style="display:grid;gap:10px">
@@ -137,5 +165,38 @@ document.getElementById("road").innerHTML=DATA.phases.map(p=>{
   return '<div class="phase"><div class="phase-head"><h2>'+esc(p.name)+'</h2><span class="chip '+st+'">'+LABEL[st]+'</span><p>'+esc(p.note)+'</p></div><ol class="track">'+
     p.steps.map(s=>'<li class="step '+s.status+'"><div class="t">'+(s.tag?'<span class="tag">'+esc(s.tag)+'</span>':'')+'<b>'+esc(s.name)+'</b><span class="chip '+s.status+'">'+LABEL[s.status]+'</span></div>'+(s.d?'<div class="d">'+esc(s.d)+'</div>':'')+'</li>').join("")+'</ol></div>';
 }).join("");
+(function(){
+  const svg=document.getElementById("map"),NS="http://www.w3.org/2000/svg";
+  const mk=(n,a,p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e};
+  const steps=[];DATA.phases.forEach((p,pi)=>p.steps.forEach((s,si)=>steps.push({...s,pi,first:si===0,phase:p.name})));
+  const per=5,rows=Math.ceil(steps.length/per),x0=90,x1=910,top=70,gap=(560-2*top)/(rows-1);
+  let d="";for(let r=0;r<rows;r++){const y=top+r*gap,a=r%2?x1:x0,b=r%2?x0:x1;
+    if(r===0)d+="M"+a+" "+y;
+    d+=" L"+b+" "+y;
+    if(r<rows-1){const c=r%2?x0-70:x1+70;d+=" C"+c+" "+y+" "+c+" "+(y+gap)+" "+b+" "+(y+gap)}}
+  const road=mk("path",{d,class:"road"});mk("path",{d,class:"dash"});
+  const L=road.getTotalLength();
+  // positions: per row evenly spaced along the straight part
+  const pos=steps.map((s,i)=>{const r=Math.floor(i/per),k=i%per,y=top+r*gap,f=(k+.5)/per;return{x:r%2?x1-(x1-x0)*f:x0+(x1-x0)*f,y}});
+  // done part of the road: up to the last done step
+  let last=-1;steps.forEach((s,i)=>{if(s.status!=="todo")last=i});
+  if(last>=0){let lo=0,hi=L;const P=pos[last];for(let k=0;k<40;k++){const m=(lo+hi)/2,q=road.getPointAtLength(m);const rowq=Math.round((q.y-top)/gap),rowp=Math.round((P.y-top)/gap);
+      if(rowq<rowp||(rowq===rowp&&(rowp%2?q.x>P.x:q.x<P.x)))lo=m;else hi=m}
+    const dp=mk("path",{d,class:"road-done"});dp.setAttribute("stroke-dasharray",lo+" "+L)}
+  const det=document.getElementById("detail");
+  const show=i=>{const s=steps[i];svg.querySelectorAll(".node").forEach((n,j)=>n.classList.toggle("sel",j===i));
+    det.innerHTML='<div class="t">'+(s.tag?'<span class="tag">'+esc(s.tag)+'</span>':'')+'<b>'+esc(s.name)+'</b><span class="chip '+s.status+'">'+LABEL[s.status]+'</span></div><p>'+esc(s.phase)+(s.d?' · '+esc(s.d):'')+'</p>'};
+  steps.forEach((s,i)=>{const {x,y}=pos[i];const g=mk("g",{class:"node "+s.status,tabindex:"0",role:"button","aria-label":(s.tag?s.tag+" ":"")+s.name+", "+LABEL[s.status]});
+    if(s.first)mk("text",{x,y:y-44,class:"ph","text-anchor":"middle"},g).textContent=DATA.phases[s.pi].name.split(":")[0];
+    if(s.status==="now")mk("circle",{cx:x,cy:y,r:14,class:"pulse"},g);
+    mk("circle",{cx:x,cy:y,r:14,class:"o"},g);
+    if(s.status==="done")mk("path",{d:"M"+(x-6)+" "+y+" l4 4 l8 -9",fill:"none",stroke:"var(--card)","stroke-width":3,"stroke-linecap":"round"},g);
+    if(s.tag)mk("text",{x,y:y-22,class:"tg","text-anchor":"middle"},g).textContent=s.tag;
+    const words=s.name.split(" ");let l1="",l2="";words.forEach(w=>{if((l1+" "+w).trim().length<=20&&!l2)l1=(l1+" "+w).trim();else l2=(l2+" "+w).trim()});
+    mk("text",{x,y:y+32,"text-anchor":"middle"},g).textContent=l1;
+    if(l2)mk("text",{x,y:y+48,"text-anchor":"middle"},g).textContent=l2.length>22?l2.slice(0,21)+"…":l2;
+    g.addEventListener("click",()=>show(i));g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();show(i)}})});
+  show(Math.max(0,steps.findIndex(s=>s.status==="now")));
+})();
 document.getElementById("have").innerHTML=DATA.have.map(h=>'<div><b>'+esc(h.name)+'</b><span>'+esc(h.d)+'</span></div>').join("");
 </script>
