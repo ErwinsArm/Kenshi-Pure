@@ -42,6 +42,10 @@ inferred (see "Evidence").
 - `docs/findings/`: what we know, one file per binary or topic (e.g. `AnarchyKenshi.dll.md`,
   `protocol.md`, `loader.md`), plus `docs/findings/README.md` as the index (create both with the
   first finding).
+- `docs/knowledge-map.html`: the user's visual overview (treemap of known / partly known /
+  unknown, English, for people outside the project). Its tiles live in the `data` object in the
+  script. Published as https://claude.ai/artifact/3BN86bz1A5bWUYGGpA9BRz (read it with the
+  Artifact tool, then publish this file with that `url`).
 - `.claude/`: hooks, critics, the `critique` skill. Hook tests: `node --test .claude/hooks/*.test.js`.
 
 ## Safety with the mod
@@ -122,7 +126,8 @@ Runtime evidence outranks critics.
 ## End of every task
 
 1. Changed `.claude/hooks/`? `node --test .claude/hooks/*.test.js` passes.
-2. Fix notes the work made false; delete finished `WORK.md` entries; delete scratch files you made
+2. Fix notes the work made false; when a finding changes what is known, update the tiles in
+   `docs/knowledge-map.html`, its date line, and republish it to the artifact; delete finished `WORK.md` entries; delete scratch files you made
    (only yours: other sessions share this checkout).
 3. Commit by path in plain English without asking: `git commit -m "<msg>" -- <files>`, never a
    plain `git commit` (it takes what another session staged). Push only when the user says so.

@@ -1,0 +1,170 @@
+<title>Kenshi Multiplayer Knowledge Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one reading column; treemap as the hero, then a ledger of every tile grouped by area */
+:root{
+  --bg:#f6f6f3; --panel:#ffffff; --fg:#1c1f22; --muted:#5d6268; --line:#dcdcd5; --accent:#7a5c2e;
+  --k-f:#cfe6b0; --k-t:#2c4d0e; --p-f:#f8d58e; --p-t:#5e3b05; --u-f:#f4c4c0; --u-t:#7a1f1c; --o-f:#d9d8d0; --o-t:#3f3f3b;
+  --font-display:"Space Grotesk",system-ui,sans-serif; --font-body:"Inter",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141517; --panel:#1c1e21; --fg:#ecebe6; --muted:#a3a7ac; --line:#33363a; --accent:#d8b27a;
+  --k-f:#2f4a1a; --k-t:#d6ecbc; --p-f:#5a4110; --p-t:#fbe2ad; --u-f:#5c2422; --u-t:#f8d3cf; --o-f:#3a3a37; --o-t:#e2e1da; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141517; --panel:#1c1e21; --fg:#ecebe6; --muted:#a3a7ac; --line:#33363a; --accent:#d8b27a;
+  --k-f:#2f4a1a; --k-t:#d6ecbc; --p-f:#5a4110; --p-t:#fbe2ad; --u-f:#5c2422; --u-t:#f8d3cf; --o-f:#3a3a37; --o-t:#e2e1da; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.6}
+.wrap{max-width:980px;margin:0 auto;padding-block:2.5rem 4rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:2rem}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:clamp(1.7rem,4vw,2.4rem)} h2{font-size:1.25rem} h3{font-size:1rem}
+p{margin:0;max-width:68ch} .muted{color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
+header{display:grid;gap:.75rem}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.chip{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.k{background:var(--k-f);color:var(--k-t)} .p{background:var(--p-f);color:var(--p-t)} .u{background:var(--u-f);color:var(--u-t)} .o{background:var(--o-f);color:var(--o-t)}
+#tm{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;min-width:0}
+#tm svg{display:block;width:100%;height:auto}
+#tip{min-height:3.2em;font-size:14px;color:var(--muted)}
+#tip b{color:var(--fg)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem}
+.stat .n{font-family:var(--font-display);font-size:1.6rem;font-weight:600;font-variant-numeric:tabular-nums}
+.stat .l{font-size:13px;color:var(--muted)}
+section{display:grid;gap:.9rem}
+.ledger{display:grid;gap:0;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:minmax(0,13rem) 6.5rem minmax(0,1fr);gap:12px;padding:.7rem 0;border-bottom:1px solid var(--line);align-items:baseline}
+.row .t{font-weight:600} .row .d{min-width:0} .row .ev{font-size:13px;color:var(--muted);margin-top:2px}
+@media (max-width:640px){.row{grid-template-columns:minmax(0,1fr) auto}.row .d{grid-column:1/-1}}
+.notes{display:grid;gap:.6rem;font-size:14px}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.9em}
+a{color:var(--accent)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Kenshi multiplayer · reverse-engineering status</div>
+    <h1>What we know, and what is still missing</h1>
+    <p class="muted">Goal: our own Kenshi multiplayer, with our own server and our own game mod, written from scratch. The reference is the existing mod <b>AnarchyKenshi</b> (v0.133.1). Its server is no longer available and its source is closed. Everything below comes from static analysis of the mod's four Windows DLLs. Nothing was run, and no server was contacted.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="n">~60</div><div class="l">network message types, layout measured</div></div>
+    <div class="stat"><div class="n">795</div><div class="l">Kenshi code addresses, all matching the Steam build</div></div>
+    <div class="stat"><div class="n">5 / 48</div><div class="l">synced game areas ("Spine") decoded</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">usable server code in the shipped package</div></div>
+  </div>
+
+  <section>
+    <div class="legend">
+      <span><i class="sw k"></i>Known: measured in the binaries</span>
+      <span><i class="sw p"></i>Partly known or in progress</span>
+      <span><i class="sw u"></i>Unknown</span>
+      <span><i class="sw o"></i>Our own design choice</span>
+    </div>
+    <div id="tm" role="img" aria-label="Treemap of the project: server, game mod and versions, each tile colored by how much is known."></div>
+    <div id="tip">Tile size is a rough estimate of how much work each part is. Hover or tap a tile for details.</div>
+  </section>
+
+  <section id="ledger-wrap">
+    <h2>Every tile, in detail</h2>
+    <div id="ledger"></div>
+  </section>
+
+  <section>
+    <h2>How to read this</h2>
+    <div class="notes">
+      <p><b>Server.</b> A multiplayer game needs a central program that every player connects to and that decides what is true in the shared world. AnarchyKenshi contains server logic inside its main DLL, but it can never run. The networking DLL that ships with it has all 192 server functions replaced by empty stubs. The mod even logs "this build has no server in it". So the server has to be written new.</p>
+      <p><b>Game mod (client).</b> The part that runs inside each player's Kenshi. It hooks into Kenshi's own code: it intercepts functions like "move character" or "save game" and reports them to the server, or applies what the server says. To do that it needs to know where those functions live in the game's executable. That is the list of 795 addresses.</p>
+      <p><b>Spine.</b> The mod's name for its sync layer. It keeps 48 areas of game state in step between players: traders, squads, injuries, machines, weather, factions and more. Each area has its own data format. 5 are decoded; the rest are being decoded now.</p>
+      <p><b>Measured vs. inferred.</b> "Known" means the fact was read directly from the binary: message sizes, field order, addresses, byte patterns. What a field means is often an educated guess and is marked as such in the detailed notes.</p>
+      <p class="muted">Sources: AnarchyKenshi v0.133.1 DLLs (SHA-256 recorded in the notes), Steam <code>kenshi_x64.exe</code> for Kenshi 1.0.68. Full notes: <a href="https://github.com/ErwinsArm/Kenshi-Pure/tree/main/docs/findings">docs/findings</a> in the project repository. Status as of 26 November 2026.</p>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const NAMES={k:'Known',p:'Partly known',u:'Unknown',o:'Our choice'};
+const data={name:'All',children:[
+{name:'Server',sub:'The central program players connect to. Must be written new.',children:[
+{name:'Game-world logic',s:'u',v:14,d:'Who is right when two players act on the same thing; running the shared world. The mod has server logic, but it cannot run without a server-capable networking DLL, which was never shipped.',ev:'Server handle is set in exactly one place, only if the stubbed AnarchyCoreCanHost returns true.'},
+{name:'Spine: 43 areas',s:'p',v:12,d:'Traders, squads, injuries, machines, stores, factions, trade, mods and more. Being decoded now in a separate session.',ev:'48 topic registrations found; common header (version byte + sequence number) is known.'},
+{name:'Meaning of fields',s:'p',v:6,d:'For every message we know the size and order of each field, but not always what each field means.',ev:'Examples still open: a shared 32-bit header in batch messages, some flags in position snapshots.'},
+{name:'Message layouts',s:'k',v:6,d:'All roughly 60 message types in both directions: hello, login, chat, positions, spawns, health, combat, inventory, doors, buildings and more.',ev:'Read from every encoder and parser in AnarchyCore.dll.'},
+{name:'World saving',s:'u',v:5,d:'How the server stores and reloads the shared world. Not visible from the client side.',ev:'Strings show world saves exist in the server code path; format not analysed.'},
+{name:'Spine: 5 areas',s:'k',v:3,d:'Rules, wallet, voting, stealth and weather are fully decoded.',ev:'From the client apply code of each topic.'},
+{name:'Connection',s:'k',v:4,d:'Uses the open-source networking library ENet 1.3.x over UDP, 5 channels, no checksum, no compression.',ev:'Library compiled in; its standard command table found in the binary.'},
+{name:'Login',s:'k',v:4,d:'Password check with SCRAM-SHA-256 (the password never leaves the PC), optional server password, and a machine fingerprint.',ev:'SHA-256, HMAC and PBKDF2 code identified by their constants.'},
+{name:'Account storage',s:'o',v:3,d:'How player accounts are stored on our server is our own decision.',ev:'The login protocol tells us what the server must keep per account.'},
+{name:'Server list',s:'k',v:2,d:'How servers announce themselves and how the public server list looks (plain HTTP, tab-separated).',ev:'Columns: address, name, players, max, password, protocol, mission, build, region, age.'},
+{name:'Remote admin',s:'k',v:2,d:'A text-based admin console over TCP (RCON) with a challenge login and 16 commands.',ev:'Greeting "AKRCON 1 <nonce>", HMAC-SHA256 login.'}]},
+{name:'Game mod (client)',sub:'Runs inside each player\'s Kenshi.',children:[
+{name:'What each hook does',s:'u',v:8,d:'For each of the up to 325 places where the mod redirects Kenshi code: what exactly it does there.',ev:'Hook list and installer known; behaviour per hook not yet documented.'},
+{name:'795 Kenshi addresses',s:'k',v:6,d:'Where functions like "move character" or "save game" live in Kenshi, for both the GOG and the Steam build.',ev:'Every byte pattern matches the Steam executable exactly once.'},
+{name:'Which hooks are needed',s:'p',v:5,d:'325 is an upper bound: some hooks only matter in server mode or behind feature switches.',ev:'A real client run is needed to see which ones install.'},
+{name:'Hooking technique',s:'k',v:4,d:'How the mod redirects Kenshi functions: its own small detour engine (jump patches with trampolines), plus a few direct code patches.',ev:'Installer, limits and error messages read from the DLL.'},
+{name:'Live behaviour',s:'u',v:3,d:'What happens inside the running game, for example whether address lookups ever disagree with the table.',ev:'The player\'s own logs may be used to check this.'},
+{name:'Launcher / updater',s:'u',v:3,d:'The mod\'s start window with server browser and self-updater.',ev:'Not analysed yet.'},
+{name:'Start-up',s:'k',v:2,d:'How Kenshi loads the mod as a graphics-engine plugin and how the mod starts its parts.',ev:'Loader and start function read in full.'},
+{name:'GOG build',s:'u',v:2,d:'Addresses for the GOG version of Kenshi are present but unchecked.',ev:'No GOG executable available to compare.'}]},
+{name:'Versions',sub:'The mod keeps updating itself.',children:[
+{name:'Newer mod 0.136',s:'u',v:3,d:'A newer version of the mod is installed on the test PC; its protocol number changed. Differences not checked yet.',ev:'Protocol 0x85 in v0.133.1; reportedly 0x88 in v0.136.1.'}]}
+]};
+
+const css=getComputedStyle(document.documentElement);
+const col=s=>({f:css.getPropertyValue('--'+s+'-f').trim(),t:css.getPropertyValue('--'+s+'-t').trim()});
+const tip=document.getElementById('tip');
+const defTip=tip.innerHTML;
+
+function draw(){
+  const box=document.getElementById('tm');
+  box.innerHTML='';
+  const W=Math.max(320,box.clientWidth-16), H=Math.round(W<600?W*1.15:W*0.6);
+  const root=d3.hierarchy(data).sum(d=>d.v||0).sort((a,b)=>b.value-a.value);
+  d3.treemap().size([W,H]).paddingOuter(4).paddingTop(d=>d.depth===1?24:0).paddingInner(3).round(true)(root);
+  const svg=d3.select(box).append('svg').attr('viewBox',`0 0 ${W} ${H}`);
+  const g=svg.selectAll('g.grp').data(root.children).join('g');
+  g.append('text').attr('x',d=>d.x0+4).attr('y',d=>d.y0+16).text(d=>d.data.name)
+   .attr('font-family','Space Grotesk, system-ui, sans-serif').attr('font-size',13.5).attr('font-weight',600).attr('fill',css.getPropertyValue('--fg'));
+  const leaf=svg.selectAll('g.leaf').data(root.leaves()).join('g').attr('tabindex',0).style('cursor','default');
+  const show=(e,d)=>{tip.innerHTML='<b>'+d.data.name+'</b> · '+NAMES[d.data.s]+'. '+d.data.d;};
+  leaf.on('mouseenter',show).on('focus',show).on('click',show).on('mouseleave',()=>{tip.innerHTML=defTip;});
+  leaf.append('rect').attr('x',d=>d.x0).attr('y',d=>d.y0).attr('width',d=>d.x1-d.x0).attr('height',d=>d.y1-d.y0).attr('rx',5).attr('fill',d=>col(d.data.s).f);
+  leaf.append('title').text(d=>d.data.name+' ('+NAMES[d.data.s]+'): '+d.data.d);
+  const fs=W<500?11:12.5;
+  leaf.each(function(d){
+    const w=d.x1-d.x0,h=d.y1-d.y0,el=d3.select(this),c=col(d.data.s).t;
+    if(w<40||h<18)return;
+    const max=Math.max(4,Math.floor((w-10)/(fs*0.56)));
+    let lines=[],cur='';
+    d.data.name.split(' ').forEach(x=>{if((cur+' '+x).trim().length>max){if(cur)lines.push(cur);cur=x;}else cur=(cur+' '+x).trim();});
+    if(cur)lines.push(cur);
+    lines=lines.slice(0,Math.max(1,Math.floor((h-6)/(fs+3))));
+    lines.forEach((l,i)=>el.append('text').attr('x',d.x0+6).attr('y',d.y0+fs+5+i*(fs+3)).text(l)
+      .attr('font-size',fs).attr('font-weight',i===0?600:500).attr('fill',c));
+  });
+}
+
+function ledger(){
+  const L=document.getElementById('ledger');
+  data.children.forEach(grp=>{
+    const s=document.createElement('section');
+    s.innerHTML='<h3>'+grp.name+'</h3><p class="muted">'+grp.sub+'</p>';
+    const list=document.createElement('div');list.className='ledger';
+    [...grp.children].sort((a,b)=>'kpuo'.indexOf(a.s)-'kpuo'.indexOf(b.s)||b.v-a.v).forEach(it=>{
+      const r=document.createElement('div');r.className='row';
+      r.innerHTML='<div class="t">'+it.name+'</div><div><span class="chip '+it.s+'">'+NAMES[it.s]+'</span></div><div class="d">'+it.d+'<div class="ev">Evidence: '+it.ev+'</div></div>';
+      list.appendChild(r);
+    });
+    s.appendChild(list);L.appendChild(s);
+  });
+}
+ledger();draw();
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(draw,150);});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+</script>
