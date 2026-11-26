@@ -240,6 +240,8 @@ during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may 
 - KenshiLib / RE_Kenshi: the user allows depending on it if it makes the mod much simpler; Claude decides
   after reading it (G12). If we depend on it, players need it installed too.
 - Licence: **MIT** for our own source; never AK binaries or decompiles.
+  Open: building on KenshiLib (GPL-3.0, see [related-projects.md](related-projects.md)) would make the
+  client plugin GPL-3.0; the user decides MIT without KenshiLib or GPL-3.0 with it.
 - In-game tests: **the user** runs them on this PC. The user's Kenshi has AK installed (no vanilla copy);
   no second copy is needed: AK is switched off for a test run and on again afterwards (the user runs
   AK's own scripts, or ours swaps the `Plugin=` lines; never by Claude without the user's words).
