@@ -47,6 +47,10 @@ inferred (see "Evidence").
   unknown, English, for people outside the project). Its tiles live in the `data` object in the
   script. Published as https://claude.ai/artifact/3BN86bz1A5bWUYGGpA9BRz (read it with the
   Artifact tool, then publish this file with that `url`).
+- `docs/roadmap.html`: the user's progress view (phases and steps done / in progress / to do, what
+  they must do next; plain words). Edit only the `DATA` object in its script. Published as
+  https://claude.ai/artifact/EXspJDbM7ChGmx25BPw89e (read it with the Artifact tool, then publish
+  this file with that `url`).
 - `.claude/`: hooks, critics, the `critique` skill. Hook tests: `node --test .claude/hooks/*.test.js`.
 
 ## Safety with the mod
@@ -127,7 +131,8 @@ Runtime evidence outranks critics.
 
 1. Changed `.claude/hooks/`? `node --test .claude/hooks/*.test.js` passes.
 2. Fix notes the work made false; when a finding changes what is known, update the tiles in
-   `docs/knowledge-map.html`, its date line, and republish it to the artifact; delete finished `WORK.md` entries; delete scratch files you made
+   `docs/knowledge-map.html`, its date line, and republish it to the artifact; when a step's state
+   or the user's next action changes, update `docs/roadmap.html` (`DATA`, `updated`) and republish it; delete finished `WORK.md` entries; delete scratch files you made
    (only yours: other sessions share this checkout).
 3. Commit by path in plain English without asking: `git commit -m "<msg>" -- <files>`, never a
    plain `git commit` (it takes what another session staged). Then pull the newest `main` and push, without asking.

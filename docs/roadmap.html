@@ -1,0 +1,141 @@
+<title>Kenshi-Pure Roadmap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column, a "you are here" summary, then the road as a vertical track of phases and steps. */
+:root{
+  --bg:#f5f3ef; --card:#fffdf9; --fg:#2a2622; --muted:#6f675e; --line:#ddd5ca;
+  --done:#3f7d4e; --done-bg:#e3efe5; --now:#b5651d; --now-bg:#f6e6d6; --todo:#8a8178; --todo-bg:#ece7e0;
+  --accent:#9a4a1c;
+  --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:Inter,system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1c1a17; --card:#25221e; --fg:#ece6dd; --muted:#a69d92; --line:#3a352f;
+  --done:#7fbf8c; --done-bg:#22352a; --now:#e3a15f; --now-bg:#3a2a1c; --todo:#9a9187; --todo-bg:#2c2925;
+  --accent:#e3a15f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1c1a17; --card:#25221e; --fg:#ece6dd; --muted:#a69d92; --line:#3a352f;
+  --done:#7fbf8c; --done-bg:#22352a; --now:#e3a15f; --now-bg:#3a2a1c; --todo:#9a9187; --todo-bg:#2c2925;
+  --accent:#e3a15f; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:860px;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:2rem}
+h2{font-size:1.25rem}
+.lead{color:var(--muted);max-width:65ch;margin:6px 0 0}
+.here{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:grid;gap:12px}
+.here .row{display:grid;grid-template-columns:110px 1fr;gap:12px}
+.here .k{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding-top:2px}
+.here .v{min-width:0}
+.bar{height:10px;border-radius:5px;background:var(--todo-bg);overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.chip.done{background:var(--done-bg);color:var(--done)}
+.chip.now{background:var(--now-bg);color:var(--now)}
+.chip.todo{background:var(--todo-bg);color:var(--todo)}
+.phase{display:grid;gap:10px}
+.phase-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+.phase-head p{margin:0;color:var(--muted);flex-basis:100%;max-width:65ch}
+.track{list-style:none;margin:0;padding:0;border-left:3px solid var(--line);margin-left:9px;display:grid;gap:4px}
+.step{position:relative;padding:8px 0 8px 22px}
+.step::before{content:"";position:absolute;left:-10px;top:13px;width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid var(--todo)}
+.step.done::before{background:var(--done);border-color:var(--done)}
+.step.now::before{background:var(--now-bg);border-color:var(--now)}
+.step .t{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.step .t b{font-weight:600}
+.step .d{color:var(--muted);margin-top:2px;max-width:65ch}
+.step.now{background:var(--now-bg);border-radius:0 8px 8px 0}
+.tag{font-family:var(--f-display);font-size:.8rem;color:var(--accent);font-weight:700}
+.have{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.have div{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+.have b{display:block;font-family:var(--f-display)}
+.have span{color:var(--muted);font-size:.9rem}
+.foot{color:var(--muted);font-size:.85rem}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Kenshi-Pure Roadmap</h1>
+    <p class="lead">Our own Kenshi multiplayer: our own server and our own game mod. This page shows where we are, what we already have, and what comes next. It is updated after every piece of work.</p>
+  </header>
+
+  <section class="here" aria-label="Where we are">
+    <div class="row"><div class="k">Now</div><div class="v" id="now"></div></div>
+    <div class="row"><div class="k">Next for you</div><div class="v" id="you"></div></div>
+    <div class="row"><div class="k">Progress</div><div class="v"><div class="bar" id="bar" role="img"></div><div class="legend" id="count" style="margin-top:6px"></div></div></div>
+  </section>
+
+  <section id="road" style="display:grid;gap:28px"></section>
+
+  <section style="display:grid;gap:10px">
+    <h2>What we already have</h2>
+    <div class="have" id="have"></div>
+  </section>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+// Edit this object to update the page. status: done | now | todo
+const DATA = {
+  updated: "26 November 2026",
+  now: "Planning is finished. Next is building step M0: our mod starts inside Kenshi.",
+  you: "Nothing right now. When a step needs a test in the game, Claude tells you exactly what to do.",
+  phases: [
+    {name:"Learn from the old mod", note:"Read AnarchyKenshi to learn how a Kenshi multiplayer works. We only look; we never copy or run its files.", steps:[
+      {tag:"L1", name:"How it talks to the server", status:"done", d:"All ~60 message types and the login are known."},
+      {tag:"L2", name:"Where Kenshi's functions are", status:"done", d:"795 places in the game (move a character, save the game, ...) found for your Steam version."},
+      {tag:"L3", name:"The 48 synced game areas", status:"done", d:"Traders, squads, injuries, weather and more: the data format of every area is written down."},
+      {tag:"L4", name:"Details we need later", status:"todo", d:"How it makes characters appear and walk. Looked up when we reach steps M4 and M5."}
+    ]},
+    {name:"Plan", note:"Decide what we build first and how.", steps:[
+      {tag:"P1", name:"Plan for the first playable step", status:"done", d:"Two players see each other's character walk. Reviewed by two critics."},
+      {tag:"P2", name:"Your decisions", status:"done", d:"Own protocol, Steam first (GOG later), AGPL licence, you test, a friend joins at the end."},
+      {tag:"P3", name:"Look at other projects", status:"done", d:"RE_Kenshi and KenshiLib help us build the mod; KenshiCoop's code may be reused."}
+    ]},
+    {name:"Build: two players see each other walk", note:"The first playable version, in small steps. Each step is tested before the next one starts.", steps:[
+      {tag:"M0", name:"Our mod starts in Kenshi", status:"now", d:"Install the build tools, check your game version, make the mod load and write a log."},
+      {tag:"M1", name:"Read your own position", status:"todo", d:"The mod knows where your character stands and where it walks."},
+      {tag:"M2", name:"Our own small server", status:"todo", d:"A small program on your PC that passes positions between players, plus a test bot."},
+      {tag:"M3", name:"Send and receive positions", status:"todo", d:"Your game and the server talk to each other while you play."},
+      {tag:"M4", name:"Move a stand-in character", status:"todo", d:"A character in your game walks where the other player walks."},
+      {tag:"M5", name:"The other player appears", status:"todo", d:"The other player's character is created when they join and removed when they leave. The hardest step."},
+      {tag:"M6", name:"Test with a friend", status:"todo", d:"Your friend connects to your PC over the internet and you see each other."}
+    ]},
+    {name:"Later", note:"Each becomes its own step after the first playable version works.", steps:[
+      {tag:"", name:"Combat between players", status:"todo", d:""},
+      {tag:"", name:"Items, trading and shared bases", status:"todo", d:""},
+      {tag:"", name:"Saving the shared world", status:"todo", d:""},
+      {tag:"", name:"Accounts, login and a public server", status:"todo", d:""},
+      {tag:"", name:"GOG version of Kenshi", status:"todo", d:""}
+    ]}
+  ],
+  have: [
+    {name:"Findings notes", d:"Everything learned from the old mod, in docs/findings."},
+    {name:"Kenshi function map", d:"795 game functions with their places in your Steam version."},
+    {name:"Message formats", d:"How the old mod's server and game talk, field by field."},
+    {name:"RE_Kenshi and KenshiLib", d:"Installed on your PC; a toolkit for building Kenshi mods."},
+    {name:"KenshiCoop", d:"Another co-op mod for your Kenshi version whose code we may reuse."},
+    {name:"Knowledge map", d:"The colored tile map: how much we know about the old mod."}
+  ]
+};
+
+const LABEL={done:"Done",now:"In progress",todo:"To do"};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+document.getElementById("now").textContent=DATA.now;
+document.getElementById("you").textContent=DATA.you;
+document.getElementById("foot").textContent="Updated "+DATA.updated+". Details: WORK.md and docs/plan-first-playable.md in the project.";
+const all=DATA.phases.flatMap(p=>p.steps);
+const n={done:0,now:0,todo:0}; all.forEach(s=>n[s.status]++);
+const bar=document.getElementById("bar");
+bar.setAttribute("aria-label",n.done+" of "+all.length+" steps done");
+[["done","--done"],["now","--now"]].forEach(([k,v])=>{const i=document.createElement("i");i.style.width=(n[k]/all.length*100)+"%";i.style.background="var("+v+")";bar.appendChild(i)});
+document.getElementById("count").innerHTML=["done","now","todo"].map(k=>'<span class="chip '+k+'">'+LABEL[k]+': '+n[k]+'</span>').join("");
+document.getElementById("road").innerHTML=DATA.phases.map(p=>{
+  const st=p.steps.every(s=>s.status==="done")?"done":p.steps.some(s=>s.status!=="todo")?"now":"todo";
+  return '<div class="phase"><div class="phase-head"><h2>'+esc(p.name)+'</h2><span class="chip '+st+'">'+LABEL[st]+'</span><p>'+esc(p.note)+'</p></div><ol class="track">'+
+    p.steps.map(s=>'<li class="step '+s.status+'"><div class="t">'+(s.tag?'<span class="tag">'+esc(s.tag)+'</span>':'')+'<b>'+esc(s.name)+'</b><span class="chip '+s.status+'">'+LABEL[s.status]+'</span></div>'+(s.d?'<div class="d">'+esc(s.d)+'</div>':'')+'</li>').join("")+'</ol></div>';
+}).join("");
+document.getElementById("have").innerHTML=DATA.have.map(h=>'<div><b>'+esc(h.name)+'</b><span>'+esc(h.d)+'</span></div>').join("");
+</script>
