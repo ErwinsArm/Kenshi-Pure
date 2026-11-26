@@ -238,10 +238,10 @@ Decided by the user:
   AK v0.136.1 installed (screenshot, **M**). The measured exe (`a596ab4e…aeb1`) contains "1.0.68" strings;
   whether it is the installed exe stays open (G8): hash the installed `kenshi_x64.exe` before M0.
 - Server for this step: **standalone relay**; revisit before any world sync.
+- KenshiLib / RE_Kenshi: the user allows depending on it if it makes the mod much simpler; Claude decides
+  after reading it (G12). If we depend on it, players need it installed too.
 
 Still open:
-5. *Depend on KenshiLib / RE_Kenshi (installed on your PC)?* **Read it as a reference (G12), do not
-   depend on it**, so a fresh clone needs nothing extra; decide again after reading.
 6. *Licence and publication:* **MIT**, our source in this repo; never AK binaries or decompiles.
 7. *Who runs the in-game tests:* **you**, on this PC, bot as second player for M0–M5. Each run
    touches the game folder (`Plugins_x64.cfg`, `mods/KenshiPure/`) and needs AK disabled.
