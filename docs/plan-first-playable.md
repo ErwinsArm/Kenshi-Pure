@@ -231,14 +231,15 @@ during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may 
 - Fail safe: any unexpected state disables the feature and logs; never kill the game.
 
 **Your call (questions, with a recommendation)**
-1. *Own protocol or wire-compatible with AK?* **Own**: compatibility drags in AK's SCRAM login and
-   machine fingerprint (MAC, disk serial), and testing would mean running its DLLs or contacting
-   its servers. (AK has newer versions; a protocol change there is hearsay, not a reason.)
-2. *Steam only, or GOG too?* **Steam only** (RVAs checked on the Steam exe; no GOG exe).
-3. *Which Kenshi version does your Steam show (1.0.65 or 1.0.68)?* Please check (Steam → Kenshi →
-   Properties, or main menu). The exe we measured says 1.0.68, your log says 1.0.65. Answer first.
-4. *Server model now: standalone relay or headless Kenshi?* Decides whether M2 is throwaway.
-   **Standalone relay** for this step; revisit before any world sync.
+Decided by the user:
+- Protocol: **own** (not wire-compatible with AK).
+- Builds: **Steam now; GOG is planned later** (needs a GOG exe to check RVAs).
+- Kenshi version: the user's main menu shows **"Kenshi 1.0.65 - x64 (Newland)"** with RE_Kenshi 0.3.5 and
+  AK v0.136.1 installed (screenshot, **M**). The measured exe (`a596ab4e…aeb1`) contains "1.0.68" strings;
+  whether it is the installed exe stays open (G8): hash the installed `kenshi_x64.exe` before M0.
+- Server for this step: **standalone relay**; revisit before any world sync.
+
+Still open:
 5. *Depend on KenshiLib / RE_Kenshi (installed on your PC)?* **Read it as a reference (G12), do not
    depend on it**, so a fresh clone needs nothing extra; decide again after reading.
 6. *Licence and publication:* **MIT**, our source in this repo; never AK binaries or decompiles.
