@@ -53,8 +53,6 @@ inferred (see "Evidence").
 - The DLLs and scripts are untrusted third-party code. **Static analysis is the default.** Never
   load, inject or run them, run the enable/disable scripts, or launch Kenshi with the mod, unless
   the user asks for that run in words; then say what it will touch (game folder, `Plugins_x64.cfg`).
-- Never contact the server in `AnarchyKenshi.cfg` or its server browser (no pings, probes,
-  logins, captures you start) without the user's OK for that exact action.
 - No secrets in the repo (account names, passwords, tokens from configs or captures).
 - The GitHub repo is public. Pushing the mod's binaries, decompiled code or large dumps there is
   redistribution: the user's call, ask first. Ghidra projects and dumps stay in gitignored folders.
@@ -76,7 +74,7 @@ inferred (see "Evidence").
 ## Who decides
 
 - Decide *how* yourself; ask only when the answer changes the work. *What* (goal, scope, anything
-  outward-facing: pushes of third-party code, posting, contacting servers) is the user's call.
+  outward-facing: pushes of third-party code, posting) is the user's call.
 - Build or analyse what the user names. Think another way is better? Say so with evidence first.
 - What the user saw (in game, in a tool) is data; never overrule it with an inference. Stop when
   their bar is met; further ideas are proposals.
