@@ -240,16 +240,18 @@ Decided by the user:
 - Server for this step: **standalone relay**; revisit before any world sync.
 - KenshiLib / RE_Kenshi: the user allows depending on it if it makes the mod much simpler; Claude decides
   after reading it (G12). If we depend on it, players need it installed too.
+- Licence: **MIT** for our own source; never AK binaries or decompiles.
+- In-game tests: **the user** runs them on this PC. The user's Kenshi has AK installed (no vanilla copy);
+  no second copy is needed: AK is switched off for a test run and on again afterwards (the user runs
+  AK's own scripts, or ours swaps the `Plugin=` lines; never by Claude without the user's words).
+- Test server: **this PC**, friends via private VPN / LAN; no public server without a login.
+- VS 2022 Build Tools (C++ workload): **yes**, installed at M0 (size checked before installing; the
+  user's limit is 10 GB).
 
 Still open:
-6. *Licence and publication:* **MIT**, our source in this repo; never AK binaries or decompiles.
-7. *Who runs the in-game tests:* **you**, on this PC, bot as second player for M0–M5. Each run
-   touches the game folder (`Plugins_x64.cfg`, `mods/KenshiPure/`) and needs AK disabled.
 8. *Is a second PC or second person available for M6?* **Yes if possible** (two instances on one
-   PC are unproven, G9); if not, the step is declared met at M5 with the bot.
-9. *Where the test server runs, who may join:* **this PC on LAN/private VPN**; no public server
-   without a login.
-10. *Install VS 2022 Build Tools (C++ workload, several GB) here?* Needed from M0.
+   PC are unproven, G9); if not, the step is declared met at M5 with the bot. A friend joins the server
+   on the user's PC over a private VPN (e.g. Tailscale or ZeroTier) or a forwarded port.
 
 ## 5. Risks and when to stop
 
