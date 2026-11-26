@@ -31,8 +31,9 @@ inferred (see "Evidence").
 
 ## Layout
 
-- `KenshiMultiplayer …/AnarchyKenshi/`: **the original mod files. Evidence: never edit, rebuild,
-  rename or "fix" them.** Work on copies outside the repo if a tool must write next to a binary.
+- `KenshiMultiplayer …/AnarchyKenshi/`: **the original mod files (gitignored, never committed:
+  only our own work goes in the repo). Evidence: never edit, rebuild, rename or "fix" them.** Work
+  on copies outside the repo if a tool must write next to a binary. Getting them: `docs/setup.md`.
 - `tools/` and `.mcp.json` (both gitignored, per machine): created by `scripts/setup-rea.ps1`
   (pinned, SHA-256-checked portable Node, JDK, Ghidra and REA in `tools/rea/`; `.mcp.json`
   registers the `rea` MCP server with that machine's paths). Setup and removal: `docs/setup.md`.

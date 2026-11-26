@@ -1,5 +1,13 @@
 # Setup: REA reverse-engineering toolchain
 
+## The mod files
+
+The repo holds only our own work, not AnarchyKenshi. Put your own copy of the mod (v0.133.1, the
+version the findings are based on) at `KenshiMultiplayer 0.133.1/AnarchyKenshi/` in the repo folder
+(gitignored). Check it against the SHA-256 values in `docs/findings/`; another version will differ.
+
+## The toolchain
+
 Windows 10 (1803+) or 11, x64. About 1.3 GB of disk space and a few minutes of downloading.
 
 ```powershell
