@@ -53,6 +53,7 @@ inferred (see "Evidence").
 - The DLLs and scripts are untrusted third-party code. **Static analysis is the default.** Never
   load, inject or run them, run the enable/disable scripts, or launch Kenshi with the mod, unless
   the user asks for that run in words; then say what it will touch (game folder, `Plugins_x64.cfg`).
+- Contacting the mod's servers (server browser, connecting, captures) is allowed without asking.
 - No secrets in the repo (account names, passwords, tokens from configs or captures).
 - The GitHub repo is public. Pushing the mod's binaries, decompiled code or large dumps there is
   redistribution: the user's call, ask first. Ghidra projects and dumps stay in gitignored folders.
