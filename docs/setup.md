@@ -19,7 +19,7 @@ Downloads pinned portable builds into `tools\rea\` (gitignored), each checked ag
 | `ghidra` | Ghidra | 12.2 |
 | `app` | [`rea-agents`](https://github.com/morluto/rea) MCP server + CLI (npm, local install) | 6.10.1 |
 
-Then it writes `.mcp.json` (gitignored), which registers `rea` for this project only with your machine's paths, and runs `rea doctor` to check Ghidra and Java.
+Then it writes `.mcp.json` (gitignored), which registers `rea` for this project only with your machine's paths and a Ghidra heap of half your RAM (at most 8G; set `GHIDRA_HEADLESS_MAXMEM`, e.g. `4G`, before running to choose another), and runs `rea doctor` to check Ghidra and Java. After changing the script, re-run it and restart Claude Code so the new `.mcp.json` is used.
 
 It does **not** run installers, change PATH or system environment variables, install global npm packages, or touch global configs (it deliberately skips `rea setup`, which edits `~/.claude.json`, Claude Desktop, Codex, VS Code and Windsurf configs). Your own Node or Java installs are not used or changed. Re-running is safe: finished parts are skipped.
 

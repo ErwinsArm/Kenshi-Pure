@@ -101,12 +101,18 @@ if ($have -ne $ReaVersion) {
   if ($LASTEXITCODE -ne 0) { throw 'npm install failed' }
 } else { "rea-agents: $ReaVersion already present, skipped" }
 
+# Ghidra's headless default heap is 2G; auto-analysis of AnarchyKenshi.dll (23 MB) ran out
+# of memory with it. Use half the RAM, capped at 8G; set GHIDRA_HEADLESS_MAXMEM to override.
+$ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+$heap  = if ($env:GHIDRA_HEADLESS_MAXMEM) { $env:GHIDRA_HEADLESS_MAXMEM } else { "$([math]::Max(2, [math]::Min(8, [math]::Floor($ramGB / 2))))G" }
+
 $config = [ordered]@{ mcpServers = [ordered]@{ rea = [ordered]@{
   command = $node
   args    = @($rea, 'mcp')
   env     = [ordered]@{
     GHIDRA_INSTALL_DIR = (Join-Path $Root 'ghidra')
     JAVA_HOME          = (Join-Path $Root 'jdk')
+    GHIDRA_HEADLESS_MAXMEM = $heap
   }
 } } }
 $json = $config | ConvertTo-Json -Depth 6
