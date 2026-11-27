@@ -117,7 +117,7 @@ KenshiCoop and WorldOfKenshi compared; calls by KenshiLib name, RVAs there are 1
 | G4 | How to stop the remote body's own AI (wandering, fleeing, fighting) from fighting our orders and the local player's orders | **Closed statically** (remote-bodies.md G4): detour `AI::periodicUpdate(float)` and skip our bodies (AK), fallback `Character::periodicUpdate` (KenshiCoop); `clearAllAIGoals` once; never `removeFromUpdateListMain`. Open: combat reactions, threads; runtime in M4 | Medium |
 | G5 | Which call makes a body *walk* naturally to a point, and how to correct drift | **Closed statically** (remote-bodies.md G5): two candidates for an M4 A/B, KenshiCoop's path walk (+ teleport snap) and AK's direct steering (+ place); speed unit calibrated in M4 | Medium |
 | G7 | World lifecycle (save load/unload, never touch stale pointers) and **zones** | **Partly closed** (remote-bodies.md G7, Removal): `~GameWorld` runs only at exit; detect reloads by an edge (KenshiCoop) or `resetGame`; keep hands, not pointers; `destroy` is deferred. Open: saves writing remote bodies, zones; runtime: M5 reload and save test, M6 starts both players together | Medium (crashes) |
-| G14 | ENet peer timeout vs. main-thread stalls of ~60 s | ENet gives up after 5–30 s of silence (pinned source, **M**); the client's network thread keeps servicing ENet during a stall: a 60 s frame-thread stall keeps the connection in `kp-core-test` (**M**); open: a real save load | Low (was Medium) |
+| G14 | ENet peer timeout vs. main-thread stalls of ~60 s | ENet gives up after 5–30 s of silence (pinned source, **M**); the client's network thread keeps servicing ENet during a stall: a 60 s frame-thread stall keeps the connection in `kp-core-test` (**M**); in game the ~19 s start and a ~6 s save load kept it (**M**); a long in-game stall not seen yet | Low (was Medium) |
 | G9 | Can two Kenshi instances run on one PC (Steam)? They would also share logs and the same game folder | Runtime, vanilla Kenshi, user approves and runs | Low: the test bot (M2) and a second PC are fallbacks |
 | G10 | Pause and game speed (up to ×20): a remote body moves only while the local game runs, at the local speed | M6 criterion: both players at the same speed, or speed sync is out of scope | Low |
 | G11 | Indoor floors (`Character+0xa4`) | Out of scope; remote bodies inside buildings may glitch | Low |
@@ -170,8 +170,9 @@ no game run needed). Spec: [protocol-ours.md](protocol-ours.md); code in `net/`;
   name, full, no Hello, malformed, wrong channel, second Hello), the client's Snapshot filter.
 - Not tested: ENet timeout leave (needs ≥ 5 s of silence); the setup on another PC.
 
-**M3 – send and receive positions in game** (M; needs G14) — **built, tests pass without the game;
-the user's in-game run is pending**. Design, threads and test: [client.md](client.md) "Networking and
+**M3 – send and receive positions in game** (M; needs G14) — **done** (tests pass without the game;
+the user's run: the bot's circle in KenshiPure.log, the user's walk in the server log, a save load kept
+the connection; a 60 s load stall only in the test). Design, threads and test: [client.md](client.md) "Networking and
 the core DLL (M3)"; the core split (step 6 of the loader plan) is `KenshiPureCore.dll`.
 - `KenshiPure.cfg` (host, port, name). **A network thread** services ENet from the start and talks
   to the frame callback through queues (no game calls off the game thread): the main thread can

@@ -122,7 +122,18 @@ facing, 0 standing); no fault.
 
 # Client: networking and the core DLL (M3)
 
-Status: built and tested without the game (below); the in-game run by the user is pending.
+Status: built, tested without the game, and run in game (**M**, the user's run on 1.0.65 with
+RE_Kenshi, build 0.0.4-m3, `kp-server --local --log-poses` + `kp-bot` on the same PC, character Nei):
+- Welcomed 0.24 s after the plugin start, before the first frame; the ~19 s from start to the first
+  frame (the frame thread does not run) kept the connection.
+- `KenshiPure.log` logged the bot's circle once a second (`net: remote bot (1) … age ~90–100 ms`);
+  the server logged the user's walk (`pose: player 2 (player) …`, moving 0/1 and paused as played).
+- A save load from the Escape menu (~6 s without own character): no `connection lost`, the same
+  player id; after each load 1 and 2 samples were dropped before sending, and the first logged
+  samples were already consistent (destination = position, yaw = facing), so the half-set-up
+  sample was not seen in this run. A 60 s load stall was not seen in game (only in the test).
+- Game exit: the server reported `player 2 left (timed out)` ~7 s later (no `dllStopPlugin`, below);
+  RE_Kenshi's known first-chance access violation at exit (`RE_Kenshi.dll+0x381e9`) came again.
 
 **Pieces**
 - `KenshiPureCore.dll` (`net/core/Core.cpp`): MSVC 14.44, C++20, static CRT, built by
@@ -161,9 +172,9 @@ missing and keeps lines already there (another server, another name).
   player, at most 64), each player's pose logged at most once a second:
   `net: remote <name> (<id>) pos … vel … yaw … moving … age … ms`.
 - Exit: the loader's `dllStopPlugin` calls KenshiPure's `kpStop` (leave + stop, at most 2 s; the
-  thread is left to the process exit if it hangs). Whether Kenshi calls `dllStopPlugin` at all is
-  **not** seen: no earlier `KenshiPureLoader.log` holds its line (**M**, 2 logs). Without it the
-  server reports the player as timed out after ENet's 5–30 s.
+  thread is left to the process exit if it hangs). Kenshi does not seem to call `dllStopPlugin`: no
+  `KenshiPureLoader.log` holds its line, 4 game exits including the M3 run (**M**); so the server
+  reports a closing player as timed out after ENet's 5–30 s (~7 s in the M3 run).
 
 **Load stalls (plan G14)**: the game's frame thread blocks ~60 s while loading; the network thread
 keeps servicing ENet meanwhile, so neither side's ENet timeout (5–30 s, protocol-ours.md "Timeouts")
@@ -178,10 +189,9 @@ while an unserviced client beside it is timed out by the server (so ENet's timeo
 aimed at a closed port fails and retries; server gone → "connection lost" → reconnect with a new
 id; stop leaves on purpose (server logs "left") in a few ms.
 
-**In-game check (user)**: `kp-server --log-poses` and `kp-bot` on this PC, Kenshi with KenshiPure;
-expected: `KenshiPure.log` shows `net: welcomed`, `net: remote bot …` with the bot's circle; the
-server log shows `pose: player … (player)` following the walk; a save load shows no
-`connection lost`.
+**In-game check**: double-click `start-test-server.cmd` (server `--local --log-poses` and bot in two
+windows, logs in `build\net\kp-server.log`, `kp-bot.log`), then play; `KenshiPure.log` shows
+`net: welcomed` and `net: remote bot …`, the server log `pose: player … (player)`.
 
 # Client: live game probe
 
