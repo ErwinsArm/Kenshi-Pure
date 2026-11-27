@@ -107,13 +107,13 @@ h2{font-size:1.25rem}
 <script>
 // Edit this object to update the page. status: done | now | todo
 const DATA = {
-  updated: "26 November 2026",
-  now: "Planning is finished. Next is building step M0: our mod starts inside Kenshi.",
-  you: "Nothing right now. When a step needs a test in the game, Claude tells you exactly what to do.",
+  updated: "27 November 2026",
+  now: "M0 is done: our mod loads in Kenshi, runs every frame and talks to the game safely. Next is M1: the mod reads where your character stands.",
+  you: "Nothing right now. AnarchyKenshi is switched back on. When a step needs a test in the game, Claude tells you exactly what to do.",
   phases: [
     {name:"Learn from the old mod", note:"Read AnarchyKenshi to learn how a Kenshi multiplayer works. We only look; we never copy or run its files.", steps:[
       {tag:"L1", name:"How it talks to the server", status:"done", d:"All ~60 message types and the login are known."},
-      {tag:"L2", name:"Where Kenshi's functions are", status:"done", d:"795 places in the game (move a character, save the game, ...) found for your Steam version."},
+      {tag:"L2", name:"Where Kenshi's functions are", status:"done", d:"795 places in the game (move a character, save the game, ...) found for Steam's game file (1.0.68). Your game actually runs 1.0.65, so our mod finds them through KenshiLib instead."},
       {tag:"L3", name:"The 48 synced game areas", status:"done", d:"Traders, squads, injuries, weather and more: the data format of every area is written down."},
       {tag:"L4", name:"Details we need later", status:"done", d:"How another player's character is created, made to walk and removed: worked out from four sources, ready for steps M4 and M5."}
     ]},
@@ -123,8 +123,8 @@ const DATA = {
       {tag:"P3", name:"Look at other projects", status:"done", d:"RE_Kenshi and KenshiLib help us build the mod; KenshiCoop's code may be reused."}
     ]},
     {name:"Build: two players see each other walk", note:"The first playable version, in small steps. Each step is tested before the next one starts.", steps:[
-      {tag:"M0", name:"Our mod starts in Kenshi", status:"now", d:"Install the build tools, check your game version, make the mod load and write a log."},
-      {tag:"M1", name:"Read your own position", status:"todo", d:"The mod knows where your character stands and where it walks."},
+      {tag:"M0", name:"Our mod starts in Kenshi", status:"done", d:"Tested by you: the mod loads, checks your game version (1.0.65), runs in every frame and reads values from the game without errors, also across a new game and a reload."},
+      {tag:"M1", name:"Read your own position", status:"now", d:"The mod knows where your character stands and where it walks."},
       {tag:"M2", name:"Our own small server", status:"todo", d:"A small program on your PC that passes positions between players, plus a test bot."},
       {tag:"M3", name:"Send and receive positions", status:"todo", d:"Your game and the server talk to each other while you play."},
       {tag:"M4", name:"Move a stand-in character", status:"todo", d:"A character in your game walks where the other player walks."},
@@ -141,7 +141,8 @@ const DATA = {
   ],
   have: [
     {name:"Findings notes", d:"Everything learned from the old mod, in docs/findings."},
-    {name:"Kenshi function map", d:"795 game functions with their places in your Steam version."},
+    {name:"Kenshi function map", d:"795 game functions with their places in Steam's 1.0.68 file (a reference; your game runs 1.0.65)."},
+    {name:"Our mod KenshiPure", d:"Builds on your PC with one command, installs with one command, and switches AnarchyKenshi off and on again."},
     {name:"Message formats", d:"How the old mod's server and game talk, field by field."},
     {name:"RE_Kenshi and KenshiLib", d:"Installed on your PC; a toolkit for building Kenshi mods."},
     {name:"KenshiCoop", d:"Another co-op mod for your Kenshi version whose code we may reuse."},

@@ -15,3 +15,4 @@ Mod in the repo: AnarchyKenshi v0.133.1. One file per binary or topic; each note
 | [AnarchyLauncher.dll.md](AnarchyLauncher.dll.md) | (v0.133.1) Replacement for Kenshi's start-up launcher (news, mods, settings, SP/MP switch) and the signed self-updater; no server browser. |
 | [remote-bodies.md](remote-bodies.md) | Showing another player as a body: spawn, move order, AI suppression, removal, world lifecycle; AK v0.133.1 compared with KenshiLib 0.5.0, KenshiCoop and WorldOfKenshi (plan gaps G3, G4, G5, G7). |
 | [ak-kenshilib-names.tsv](ak-kenshilib-names.tsv) | (v0.133.1) AK site-table names matched to KenshiLib 0.5.0 declarations by address offset (622 rows, inferred per row). |
+| [kenshi-build.md](kenshi-build.md) | Which Kenshi exe the game runs (RE_Kenshi's 1.0.65), how RE_Kenshi plugins load, KenshiLib and the v100 toolchain. |

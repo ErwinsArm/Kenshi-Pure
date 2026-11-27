@@ -129,32 +129,25 @@ G8, G6, G13 come first (M0). G1-G5, G7, G12 are load-bearing analysis (Opus high
 Working name **KenshiPure** (DLL, log and cfg names can change later). Every milestone ends with a
 commit; nothing from AK or the game is committed.
 
-**M0 – toolchain, version pin, frame hook and ABI proof** (S-M; closes G8, G6, G13)
-- C++20, CMake, MSVC (VS 2022 Build Tools) as the starting point; **toolchain not decided** until
-  the ABI proof passes (VS2010 CRT, §1). Rules for Kenshi-facing glue: only POD arguments and
-  explicit out-pointers; never STL or `Ogre::String` across the boundary; DLL built `/MT`; a string
-  Kenshi later frees must come from Kenshi's allocator. One codebase for client, server and bot.
-- `scripts/setup-build.ps1` finds MSVC with `vswhere`, configures `build/` (gitignored). Third-party
-  code (ENet 1.3.x, doctest, maybe MinHook) via `FetchContent` pinned by URL and SHA-256.
-- Plugin exports `dllStartPlugin`/`dllStopPlugin` and writes `KenshiPure.log` next to itself (the
-  log is how Claude sees what happened in a run). It logs: the loaded exe's SHA-256 and any version
-  string ("known build / unknown build: staying inactive", G8); the frame callback's thread id next
-  to one harmless game call; a tick line per second. A vectored exception handler only logs the
-  faulting RVA and module and lets Kenshi's own handling continue.
-- Frame hook: try an Ogre `FrameListener` first (order vs. Kenshi's, G6); if unreliable or on the
-  wrong thread, MinHook-detour `MainListener_frameRenderingQueued` (B277).
-- ABI proof: from the callback call one trivial Kenshi function with POD arguments (motionNow, or a
-  read-only getter) and compare with a known value; any string/STL object needs a prior allocator
-  and layout proof. Pass: no crash, plausible value, repeated across a save load and unload.
-- `scripts/install-client.ps1 -GameDir <path> [-Uninstall]`: copies the DLL to
-  `<game>/mods/KenshiPure/`, adds/removes one `Plugin=` line; coexists with an existing `RE_Kenshi`
-  line (never reorders or drops others) and an existing `.before-anarchy` backup (never overwritten;
-  own backup name).
-- Crash dumps: location not measured. M0 finds where Kenshi/Windows put them (game folder,
-  `%LOCALAPPDATA%\CrashDumps` if LocalDumps is on) and writes it into `docs/setup.md`.
-- Without the game: build, Pester tests of the cfg edit on a temp copy (Pester 3 ships with Windows).
-- In game (user): AK disabled, Kenshi runs normally; log shows build verdict, thread id, frame
-  ticks; ABI proof passes.
+**M0 – toolchain, version pin, frame hook and ABI proof** — **done** (user's in-game run,
+log read): G8, G6, G13 closed. Details and evidence: [kenshi-build.md](findings/kenshi-build.md).
+- G8: the game runs RE_Kenshi's 1.0.65 Steam exe (`504b36…`), not Steam's 1.0.68 `a596…`; the
+  plugin logs path and hash at start (**M**). So the Steam RVAs in kenshi-sites.tsv do not apply;
+  Kenshi code is reached through KenshiLib.
+- G12: the client is an RE_Kenshi plugin on KenshiLib 0.5.0 (mod folder + `RE_Kenshi.json`,
+  export `?startPlugin@@YAXXZ`), built with VC++ 2010 (v100) x64 `/MD` from the Windows SDK 7.1 ISO
+  (`scripts/setup-build.ps1`, `scripts/build-plugin.ps1`); source in `client/`.
+- G6: frame hook via `KenshiLib::AddHook` on `GameWorld::_NV_mainLoop_GPUSensitiveStuff`; it runs
+  on the game-window thread, ~45-75 frames/s, through a new game and a save load (**M**). Not an
+  Ogre FrameListener (KenshiLib asks plugins to use its hook system).
+- G13: `ou == gw`, `getFrameSpeedMultiplier`, `isPaused`, `getTimeStamp` gave plausible values for
+  ~5 min, no fault (**M**). The v100 toolchain is the plugin's toolchain; server, bot and tests get a
+  modern compiler at M2 (shared code then compiles under both, or the plugin talks to a modern core
+  through a plain C interface).
+- `scripts/install-client.ps1` switches AK off / KenshiPure on and back (Pester tests in
+  `scripts/tests/`).
+- Not done: where crash dumps go (Kenshi writes `crashDump<ver>_x64.dmp` in the game folder, **M**;
+  Windows LocalDumps not checked).
 
 **M1 – read own position** (M; needs G1, G2, G6, G8)
 - Each frame in a loaded world: find the local character, read position, yaw, velocity, walking;
@@ -207,7 +200,7 @@ proof, not in parallel; it is throwaway if the user later picks a headless-Kensh
   outside active zones are probably not ticked, G7) and at the same game speed (or speed sync is
   out of scope, G10). Check: each sees the other's character walk where the other walks.
 
-Order: M0 → M1 (after the G2 sheet) → M2 (only after M0's proof) → M3 → M4; G3/G4/G7 analysis
+Order: M0 (done) → M1 (after the G2 sheet) → M2 (only after M0's proof) → M3 → M4; G3/G4/G7 analysis
 during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may overlap the user's runs.
 
 ## 4. Design choices
@@ -233,7 +226,7 @@ during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may 
 - Builds: **Steam now; GOG is planned later** (needs a GOG exe to check RVAs).
 - Kenshi version: the user's main menu shows **"Kenshi 1.0.65 - x64 (Newland)"** with RE_Kenshi 0.3.5 and
   AK v0.136.1 installed (screenshot, **M**). The measured exe (`a596ab4e…aeb1`) contains "1.0.68" strings;
-  whether it is the installed exe stays open (G8): hash the installed `kenshi_x64.exe` before M0.
+  it is Steam's exe, but the game runs RE_Kenshi's 1.0.65 copy (`504b36…`, G8 closed in M0).
 - Server for this step: **standalone relay**; revisit before any world sync.
 - KenshiLib / RE_Kenshi: the user allows depending on it if it makes the mod much simpler; Claude decides
   after reading it (G12). If we depend on it, players need it installed too.
@@ -244,8 +237,8 @@ during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may 
   no second copy is needed: AK is switched off for a test run and on again afterwards (the user runs
   AK's own scripts, or ours swaps the `Plugin=` lines; never by Claude without the user's words).
 - Test server: **this PC**, friends via private VPN / LAN; no public server without a login.
-- VS 2022 Build Tools (C++ workload): **yes**, installed at M0 (size checked before installing; the
-  user's limit is 10 GB).
+- VS 2022 Build Tools (C++ workload): **yes** (limit 10 GB). Not needed for M0 (the plugin uses VC++ 2010
+  from the SDK 7.1 ISO, ~1.7 GB in `tools/build/`, downloads approved by the user); installed at M2.
 
 - Second player for M6: **a friend of the user** joins the server on the user's PC over a private VPN
   (e.g. Tailscale or ZeroTier) or a forwarded port.

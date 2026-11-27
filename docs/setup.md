@@ -68,3 +68,25 @@ This deletes `tools\rea\` and `.mcp.json`. Outside the repo, once Ghidra has run
 ## Upgrading a tool
 
 Edit the URL and SHA-256 together in `scripts\setup-rea.ps1` (official checksum sources are listed there), delete that tool's folder in `tools\rea\`, and re-run the script.
+
+# Setup: building the KenshiPure client plugin
+
+Needs git, Windows 10/11 x64, about 2.5 GB free while setting up (1.7 GB afterwards). Nothing is
+installed into Windows: the VC++ 2010 compiler is unpacked from Microsoft's Windows SDK 7.1 ISO into
+`toolsuild\` (gitignored), with KenshiLib 0.5.0 and Boost 1.60 headers, all pinned by SHA-256.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup-build.ps1
+powershell -ExecutionPolicy Bypass -File scriptsuild-plugin.ps1
+```
+
+Install into a Kenshi with RE_Kenshi 0.3.5 (switches AnarchyKenshi off; `-Uninstall` switches back):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install-client.ps1 -GameDir "<Kenshi folder>"
+```
+
+The plugin writes `<Kenshi>\mods\KenshiPure\KenshiPure.log`. Kenshi's own crash dumps land in the
+game folder as `crashDump<version>_x64.dmp`. Tests of the install script:
+`powershell -ExecutionPolicy Bypass -Command "Import-Module Pester -RequiredVersion 3.4.0; Invoke-Pester scripts	ests"`.
+Removal: `scripts\setup-build.ps1 -Uninstall`.

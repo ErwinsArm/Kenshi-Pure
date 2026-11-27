@@ -1,3 +1,4 @@
 tools/
 .mcp.json
 KenshiMultiplayer*/
+build/
