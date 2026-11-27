@@ -2,3 +2,5 @@
 KenshiMultiplayer*/** -text
 # Git hooks run under sh: keep LF endings on every checkout.
 .githooks/* text eol=lf
+# cmd.exe needs CRLF line endings, on every clone.
+*.cmd text eol=crlf
