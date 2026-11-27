@@ -411,8 +411,8 @@ since the encoder is in the stubbed Core; the name *inferred* from logs
 the player's floor from Position field 15 (map `AK 0x195f768`), else `Character+0xa4` via
 `AK 0x2c4320`, clamped ≥ 0. Client: `AK 0x4fdd50` keeps it per entity (value +0x228, i.e. map node +0x248); `AK 0x502241`
 copies it into the local body's `Character+0xa4` (setter `AK 0x4fb800`, behind a config byte);
-the remote-body ground walk (`AK 0x502f90`) does not walk a body whose floor is above 0 but places
-it (`AK 0x4f9440`). How floors ≥ 8 are encoded is *unknown* (the server encoder is in the stubbed
+for a remote body whose floor is above 0, `AK 0x502f90` returns 0 without a walk
+and only records a place target (`AK 0x4f9440`, Kenshi-free bookkeeping); the Kenshi place call is `AK 0x4fba20` ([remote-bodies.md](remote-bodies.md)). How floors ≥ 8 are encoded is *unknown* (the server encoder is in the stubbed
 Core).
 
 **Spine** (opaque channel for AnarchyKenshi.dll): client→server `3e` (`0x2d550`): `u8 3e`,

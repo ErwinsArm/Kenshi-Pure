@@ -73,23 +73,20 @@ in-game runs **by the user**; Claude can only read the logs those runs leave.
 - "Mine" candidates (names only, **I**): `GameWorld_tickedCharacters` A227 `0x664360`,
   `Character_isPlayerOwned` A118 `0x7916d0`, `PlayerInterface_pickOwned` A305 `0x7f90b0`.
 
-**Spawning and moving a remote body** (rows exist and AK calls or detours them, kenshi-sites.tsv
-**M**; arguments and exact use **not in the notes**)
-- Spawn: `RootObjectFactory_spawnCharacter` A321 `0x5836e0` (called, not detoured; 0x138-byte frame
-  by the critic **M**, so many hidden inputs **I**); templates via `GameDataContainer_getData_string`
-  A202 `0x6bd4e0` / `GameDataContainer_recordNamed` A203 `0x6bfda0`; faction via
-  `FactionRegistry_factionOrNew_GameData` A180 `0x2e7690`, `Faction_createSquad` A186 `0x7f4420`.
-- Remove: `GameWorld_destroy_RootObject_bool_char` A214 `0x799af0` (AK detours it, and also
-  `GameWorld_deleteLater`; Kenshi has AI/lane worker threads, hooks.md **M**), so removal must be
-  deferred (**I**).
-- Move: `CharMovement_goToDirect_Vector3_MovePriority_bool` A53 `0x661270`, `Character_goTo` A105
-  `0x5c95b0`, `CharMovement_placeDirect` A58 `0x65e870`, `Character_teleport_Vector3` A163
-  `0x5ca680`, `CharMovement_haltDirect` A54, `CharMovement_setMoveMode` A61. Speed: AK's server
-  calls `AbstractMovementBase_wantSpeed_float` A16 `0x3332f0` (protocol.md Position field 8, **M**).
-- AK's client walks remote bodies on the ground (`AK 0x502f90`) and only places them (`AK 0x4f9440`)
-  when their floor is above 0 (protocol.md "Snapshot `05`", **M**). It logs "world drawn <ms> ms
-  behind" (**M** string), so bodies are drawn with a delay (**I**). Which Kenshi calls `0x502f90`
-  makes is not in the notes.
+**Spawning and moving a remote body** ([remote-bodies.md](findings/remote-bodies.md): AK, KenshiLib,
+KenshiCoop and WorldOfKenshi compared; calls by KenshiLib name, RVAs there are 1.0.68)
+- Spawn: `Faction::createNewEmptyActivePlatoon(0, true, pos)` → `Platoon::getActivePlatoon()` →
+  `RootObjectFactory::createRandomCharacter(faction, pos, activePlatoon, template, 0, 1.0)` (AK and
+  WoK agree, **M**; WoK "verified in game" **D**).
+- AI: skip `AI::periodicUpdate(float)` (AK) or `Character::periodicUpdate` (KenshiCoop) for our
+  bodies in a detour (**M**); never `removeFromUpdateListMain` on a driven body (**D** KenshiCoop).
+- Move, two candidates for M4: `Character::setDestination` + `CharMovement::setDestination(dest,
+  HIGH_PRIORITY, false)` + `setDesiredSpeed`, snap with `_setPositionDirectionAndTeleport`
+  (KenshiCoop, **M**/**D**); or AK's way: AK steers its copies per frame with
+  `setDirectMovement` and places them with `_setPositionSimple` + `teleportVisuallyOnly` (**M**).
+- Remove: `GameWorld::destroy(body, false, reason)` on the main thread, once (all three agree,
+  **M**); the engine frees the body later through its kill lists (**M**).
+  AK's "GameWorld_deleteLater" is `destroy(AttachedEntity*)`, not a deferred character delete.
 - AK's Spawns `08` entry carries id, strings, x/y/z (**I**) and a float; Character `09` name,
   texts and an appearance blob (protocol.md, sizes **M**, meanings **I**). Appearance is out of scope.
 - Characters outside the active zones are probably not ticked, so a remote body far from the local
@@ -116,10 +113,10 @@ in-game runs **by the user**; Claude can only read the logs those runs leave.
 | G1 | Which `Character*` is the local player's (selected, squad leader, first owned?) and how to reach it from `Global_gameWorld` | Static: read AK's sender `AK 0x2f5a30` and its caller; fallback: iterate `GameWorld_tickedCharacters` + `Character_isPlayerOwned`; KenshiLib headers (G12) | High (blocks M1) |
 | G2 | Verified **calling-convention sheet** for the ~6 functions M1/M4 use (position source, orientation, motionNow, goTo, place, halt): this/out-pointer/return, argument count, `MovePriority` values | Static, before M1: AK call sites + disassembly of the exe + KenshiLib headers. Already measured: motionNow and orientation (§1); positionDirect is not a getter | High (wrong signature = crash) |
 | G12 | What do KenshiLib / RE_Kenshi already give us (headers, RVA files for 1.0.65, hook helpers)? | Read its headers and `RVAs/*.br` format (read-only, installed on this PC); decide with the user whether we depend on it | Medium (may save G2/G3 work, or add a hard dependency) |
-| G3 | How to spawn: arguments of `spawnCharacter`, hidden inputs behind its 0x138-byte frame, template record and faction, squad/platoon; does `getData_string` take a VS2010 `std::string` (then it needs Kenshi's allocator) | Static: AK's consumer of `AnarchyClientSpawnAt` → A321; KenshiLib headers; read A321 in Kenshi | High (blocks M5; M4 avoids it) |
-| G4 | How to stop the remote body's own AI (wandering, fleeing, fighting) from fighting our `goTo` orders and the local player's orders | Static: how AK's remote bodies avoid it (its `AI_thinkDirect` detour etc.); then a runtime check | Medium-High |
-| G5 | Which call makes a body *walk* naturally to a point, and how to correct drift | Static: read `AK 0x502f90` / `0x4f9440`; runtime: compare goTo vs. place in M4 | Medium |
-| G7 | World lifecycle (save load/unload, never touch stale pointers) and **zones**: bodies outside active zones are probably not ticked | Static: AK's `GameWorld_destructor` (B, detoured), load hooks (`SaveManager_load_*`), `GameWorld_deleteLater`; runtime: M5 reload test; M6 starts both players at the same place | Medium (crashes) |
+| G3 | How to spawn: arguments, template, faction, squad | **Closed statically** ([remote-bodies.md](findings/remote-bodies.md) G3): squad via `createNewEmptyActivePlatoon`, then `createRandomCharacter` with that squad as owner (AK and WoK agree, KenshiLib signatures). Open: 1.0.65 offsets, squad cleanup, faction read-back, by the first spawn run | Medium (was High; first run in M4/M5) |
+| G4 | How to stop the remote body's own AI (wandering, fleeing, fighting) from fighting our orders and the local player's orders | **Closed statically** (remote-bodies.md G4): detour `AI::periodicUpdate(float)` and skip our bodies (AK), fallback `Character::periodicUpdate` (KenshiCoop); `clearAllAIGoals` once; never `removeFromUpdateListMain`. Open: combat reactions, threads; runtime in M4 | Medium |
+| G5 | Which call makes a body *walk* naturally to a point, and how to correct drift | **Closed statically** (remote-bodies.md G5): two candidates for an M4 A/B, KenshiCoop's path walk (+ teleport snap) and AK's direct steering (+ place); speed unit calibrated in M4 | Medium |
+| G7 | World lifecycle (save load/unload, never touch stale pointers) and **zones** | **Partly closed** (remote-bodies.md G7, Removal): `~GameWorld` runs only at exit; detect reloads by an edge (KenshiCoop) or `resetGame`; keep hands, not pointers; `destroy` is deferred. Open: saves writing remote bodies, zones; runtime: M5 reload and save test, M6 starts both players together | Medium (crashes) |
 | G14 | ENet peer timeout vs. main-thread stalls of ~60 s | Verify the timeout constants in the pinned ENet source (critic's memory: ~30 s, unverified); network thread (M3) | Medium |
 | G9 | Can two Kenshi instances run on one PC (Steam)? They would also share logs and the same game folder | Runtime, vanilla Kenshi, user approves and runs | Low: the test bot (M2) and a second PC are fallbacks |
 | G10 | Pause and game speed (up to ×20): a remote body moves only while the local game runs, at the local speed | M6 criterion: both players at the same speed, or speed sync is out of scope | Low |
@@ -186,18 +183,19 @@ proof, not in parallel; it is throwaway if the user later picks a headless-Kensh
   the user's walk; a save load does not drop the connection.
 
 **M4 – drive a stand-in body** (M; needs G2, G5, G4 partly)
-- Before spawning exists, take an existing character as the stand-in (e.g. the second member of a
-  start with two characters, picked by name) and drive it from the bot's poses: first place it each
+- The stand-in is a body outside the local player's squad: one spawned with the G3 recipe or a
+  nearby NPC (a player-squad member takes a different move call, remote-bodies.md G5). Drive it
+  from the bot's poses: first place it each
   snapshot (proves coordinates), then walk it with a move order to the interpolated target
-  (~150 ms behind) and snap when it drifts more than a few metres. The stand-in's own AI may
+  (~150 ms behind) and snap when it drifts more than a few metres; try both G5 candidates. The stand-in's own AI may
   contradict our orders (G4); that is measured here.
 - Without the game: interpolation/correction tests with the fake game.
 - In game: the stand-in walks the bot's circle, animated, facing forward.
 
 **M5 – spawn and remove a remote body** (L; the longest part; needs G3, G4, G7)
 - On PlayerJoined spawn a body at the pose, drive it as in M4; on PlayerLeft or disconnect remove
-  it **deferred** (`GameWorld_deleteLater` semantics, never inside a worker-thread callback); drop
-  all bodies on world unload, recreate on load. Most time goes into spawnCharacter's hidden inputs
+  it with `GameWorld::destroy(body, false, reason)` from the frame hook (main thread, never inside a worker-thread callback); drop
+  all bodies on world unload, recreate on load. Recipe: [remote-bodies.md](findings/remote-bodies.md); most risk is in the spawn arguments
   (G3) and the body's own AI fighting `goTo` orders (G4).
 - Without the game: lifecycle tests with the fake game (join, leave, reconnect, world reload).
 - In game: bot starts → a body appears and walks; stops → it vanishes; save/load/menu → no crash,
