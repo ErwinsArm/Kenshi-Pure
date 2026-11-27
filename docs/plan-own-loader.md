@@ -102,7 +102,8 @@ Built when the first protocol code is written (M2); before that the core would b
   positions and states in, orders for stand-in characters out); `kpCoreStop`. The host passes log and time.
 - The game adapter (VS2010: loader, address layer, hooks, KP_FIELD reads, game calls) builds the
   snapshots on the frame thread and applies the outputs; nothing else crosses.
-- Toolchain: a pinned VS Build Tools or clang-cl in `setup-build.ps1` (chosen when M2 starts).
+- Toolchain: MSVC 14.44 from `scripts/setup-modern.ps1` (M2); the protocol codec (`net/proto/`) and
+  `NetClient` (`net/client/`) are what the core links.
 
 ## Blind spots still open (need runs or data)
 

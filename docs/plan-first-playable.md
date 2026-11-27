@@ -155,15 +155,20 @@ log read): G8, G6, G13 closed. Details and evidence: [kenshi-build.md](findings/
 - Without the game: unit tests (quaternion→yaw, finite checks, rate limiter).
 - In game: logged x/z follow the walk, velocity ~0 when standing, yaw turns; menu and reload: no crash.
 
-**M2 – server, protocol and test bot** (M; no game needed; starts after M0's frame-hook and ABI
-proof, not in parallel; it is throwaway if the user later picks a headless-Kenshi server)
-- Own small protocol (spec in `docs/protocol-ours.md`): Hello (protocol version, name), Welcome
-  (player id), Reject, Pose (f32 position, velocity, yaw, flags; unreliable channel), Snapshot
-  (tick, n × {player id, pose}; unreliable), PlayerJoined/PlayerLeft (reliable). AK's framing
-  rules (type byte, LE, `str16`, exact consume, finite floats).
-- Standalone console relay server (not authoritative), 10 Hz snapshots; `bot` CLI that walks a circle.
-- Tests: codec round trips, truncated/oversized/trailing-byte/NaN rejection; server + two loopback
-  clients: B's pose reaches A within 300 ms, leave → PlayerLeft.
+**M2 – server, protocol and test bot** (M; no game needed) — **done** (tests pass on this PC;
+no game run needed). Spec: [protocol-ours.md](protocol-ours.md); code in `net/`; build: [setup.md](setup.md).
+- Protocol v1: Hello, Welcome, Reject, Pose, Snapshot (each entry with the pose's age in ms, so a
+  stalled player is visible), PlayerJoined, PlayerLeft; AK's framing rules; 2 ENet channels
+  (reliable control, unreliable poses); every message ≤ 1200 bytes.
+- `kp-server`: standalone relay, 10 Hz snapshots, port configurable, up to 32 players. `kp-bot`:
+  walks a circle at 10 Hz. Toolchain: `scripts/setup-modern.ps1` (MSVC 14.44 + SDK unpacked from
+  Microsoft's pinned package manifest, CMake 4.5.1, Ninja 1.13.2, ENet 1.3.18; no installer,
+  1.6 GB) and `scripts/build-net.ps1`.
+- Tests (CTest): codec layouts, round trips, every truncation, trailing byte, oversize, NaN/inf and
+  range rejection; loopback server + clients: B's pose reaches A within 300 ms (measured worst
+  ~102 ms over 5 runs, set by the 100 ms tick), leave → PlayerLeft "left", rejects (version, bad
+  name, full, no Hello, malformed, wrong channel, second Hello), the client's Snapshot filter.
+- Not tested: ENet timeout leave (needs ≥ 5 s of silence); the setup on another PC.
 
 **M3 – send and receive positions in game** (M; needs G14)
 - `KenshiPure.cfg` (host, port, name). **A network thread** services ENet from the start and talks
@@ -206,8 +211,12 @@ during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may 
 ## 4. Design choices
 
 **Decided ("how")**
-- C++20 + CMake for client, server and bot; MSVC default, **final toolchain only after the M0 ABI
-  proof**. Server builds on Windows; Linux later if wanted.
+- C++20 + CMake for server, bot, tests and (M3) the client core: MSVC 14.44 unpacked by
+  `scripts/setup-modern.ps1`; the plugin side stays VC++ 2010 (M0). Server builds on Windows; Linux
+  later if wanted.
+- The codec is plain C++20 and lives only on the modern side: at M3 it goes into the client core
+  DLL behind the plain C interface ([plan-own-loader.md](plan-own-loader.md) "Core split"); the
+  VS2010 side never compiles it.
 - ENet 1.3.x (MIT), the transport AK uses, so its measured channel and size limits are a tested
   template; pinned by hash.
 - Find Kenshi code by exe SHA-256 + RVAs from `kenshi-sites.tsv`; unknown exe → plugin stays
@@ -238,7 +247,9 @@ during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may 
   AK's own scripts, or ours swaps the `Plugin=` lines; never by Claude without the user's words).
 - Test server: **this PC**, friends via private VPN / LAN; no public server without a login.
 - VS 2022 Build Tools (C++ workload): **yes** (limit 10 GB). Not needed for M0 (the plugin uses VC++ 2010
-  from the SDK 7.1 ISO, ~1.7 GB in `tools/build/`, downloads approved by the user); installed at M2.
+  from the SDK 7.1 ISO, ~1.7 GB in `tools/build/`, downloads approved by the user). At M2 its compiler
+  and SDK were unpacked into `tools/modern/` (1.6 GB) instead of running the installer: same Microsoft
+  packages, no admin rights, identical on every clone.
 
 - Second player for M6: **a friend of the user** joins the server on the user's PC over a private VPN
   (e.g. Tailscale or ZeroTier) or a forwarded port.

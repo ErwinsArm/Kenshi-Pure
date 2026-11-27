@@ -107,3 +107,30 @@ Tools: `kenshi_status`, `kenshi_characters`, `kenshi_nearby`, `kenshi_health`, `
 `kenshi_find_items`, `kenshi_log_tail`; with `install-client.ps1 -ProbeWrite` also `kenshi_heal`,
 `kenshi_teleport`, `kenshi_spawn_item`. Tests (no game needed): `node --test mcp/*.test.mjs`.
 How it works: `docs/client.md`.
+
+# Setup: building the server and the test bot
+
+Needs Windows 10/11 x64, about 1.7 GB free (1.6 GB afterwards), no admin rights. The VS 2022 C++
+compiler (MSVC 14.44, the C++ part of the VS Build Tools) and the Windows SDK 10.0.26100 are unpacked
+from Microsoft's own package files into `tools\modern\` (gitignored; nothing is installed into
+Windows, so an existing Visual Studio is neither used nor changed), together with CMake 4.5.1, Ninja
+1.13.2 and the ENet 1.3.18 sources, all pinned by SHA-256. Using Microsoft's files means accepting
+the [VS Build Tools licence](https://go.microsoft.com/fwlink/?LinkId=2179911).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup-modern.ps1
+powershell -ExecutionPolicy Bypass -File scripts\build-net.ps1
+```
+
+The build script builds `build\net\Release\kp-server.exe` and `kp-bot.exe` (static runtime: they run
+on PCs without Visual Studio) and runs the tests (codec, and server + clients over loopback). Run
+them:
+
+```powershell
+build\net\Release\kp-server.exe --port 27850
+build\net\Release\kp-bot.exe --host 127.0.0.1 --port 27850 --name Bot --radius 50 --speed 20
+```
+
+`kp-server --local` accepts only this PC; without it Windows may ask once whether to allow it
+through the firewall. `--help` lists the options. Protocol: `docs/protocol-ours.md`.
+Removal: `scripts\setup-modern.ps1 -Uninstall` (deletes `tools\modern\`) and delete `build\net\`.
