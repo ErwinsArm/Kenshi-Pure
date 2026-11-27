@@ -108,8 +108,8 @@ h2{font-size:1.25rem}
 // Edit this object to update the page. status: done | now | todo
 const DATA = {
   updated: "27 November 2026",
-  now: "Our own starter (M0b) is built and checked without the game: it no longer needs RE_Kenshi or KenshiLib. It waits for your test runs. Then M1.",
-  you: "Three short test runs in the game (RE_Kenshi on, RE_Kenshi off, each with ReShade as you have it): start Kenshi normally, check the picture fills the screen without Alt+Enter, load a save, wait a minute, close the game. Claude reads the logs after each run.",
+  now: "Our own starter (M0b) works: tested by you with and without RE_Kenshi. Next: M1, the mod reads where your character is and where it walks.",
+  you: "Nothing right now. Next session starts M1 (or the in-game cheat menu, your choice).",
   phases: [
     {name:"Learn from the old mod", note:"Read AnarchyKenshi to learn how a Kenshi multiplayer works. We only look; we never copy or run its files.", steps:[
       {tag:"L1", name:"How it talks to the server", status:"done", d:"All ~60 message types and the login are known."},
@@ -124,7 +124,7 @@ const DATA = {
     ]},
     {name:"Build: two players see each other walk", note:"The first playable version, in small steps. Each step is tested before the next one starts.", steps:[
       {tag:"M0", name:"Our mod starts in Kenshi", status:"done", d:"Tested by you: the mod loads, checks your game version (1.0.65), runs in every frame and reads values from the game without errors, also across a new game and a reload."},
-      {tag:"M0b", name:"Our own starter, no RE_Kenshi needed", status:"now", d:"The mod starts by itself, early, on Steam's normal Kenshi (1.0.68) and on 1.0.65, with or without RE_Kenshi, like AnarchyKenshi, and fixes the stretched full-screen picture. Done: tools; our own address list (all 57 game places the mod uses, each checked in both game versions by a script and by two critics; none moved in a way that matters); the mod no longer uses KenshiLib; our own starter with the picture fix and installer. Left: your test runs (RE_Kenshi on and off). One small part, the inventory view of the probe, stays off on 1.0.68 for now."},
+      {tag:"M0b", name:"Our own starter, no RE_Kenshi needed", status:"done", d:"The mod starts by itself, early, on Steam's normal Kenshi (1.0.68) and on 1.0.65, with or without RE_Kenshi, like AnarchyKenshi, and fixes the stretched full-screen picture. Done: tools; our own address list (all 57 game places the mod uses, each checked in both game versions by a script and by two critics; none moved in a way that matters); the mod no longer uses KenshiLib; our own starter with the picture fix and installer. Tested by you: with RE_Kenshi (1.0.65) and without it (Steam 1.0.68) the mod started, found its addresses, ran every frame, the picture filled the screen without Alt+Enter, and the probe read your character. Without RE_Kenshi the game takes about 100 s to its first picture (RE_Kenshi's shader cache is missing). The probe's inventory view stays off on 1.0.68 for now."},
       {tag:"M1", name:"Read your own position", status:"todo", d:"The mod knows where your character stands and where it walks."},
       {tag:"M2", name:"Our own small server", status:"todo", d:"A small program on your PC that passes positions between players, plus a test bot."},
       {tag:"M3", name:"Send and receive positions", status:"todo", d:"Your game and the server talk to each other while you play."},

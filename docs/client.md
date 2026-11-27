@@ -1,7 +1,9 @@
 # Client: how KenshiPure starts and finds the game
 
 Labels: **M** measured, **D** documented, **I** inferred. Plan and reasons: [plan-own-loader.md](plan-own-loader.md).
-Not yet run in game in this form (built and checked statically; game runs pending).
+Run in game (**M**, user runs): with RE_Kenshi on 1.0.65 (57/57 rows) and without it on Steam 1.0.68 (56/57,
+`inventory` off): loader and plugin started, frame check passed, DXGI STRETCHED -> UNSPECIFIED, picture full
+screen without Alt+Enter, probe `status`/`characters` answered on 1.0.68.
 
 ## Start: KenshiPureLoader.dll (Ogre plugin)
 
@@ -169,7 +171,8 @@ never loads `dxgi.dll` itself and a ReShade `dxgi.dll` in the game folder still 
 loads into the RE_Kenshi copy, **M**, `ReShade.log`). It creates a factory through the game's `dxgi.dll`
 and through Windows' one, detours vtable slot 10 (`CreateSwapChain`) of each, and in the first call the
 new swap chain's slot 14 (`ResizeTarget`); both set `Scaling = UNSPECIFIED` on a copy of the description
-and log before/after (`dxgi: ...` in `KenshiPureLoader.log`). Not yet run in game.
+and log before/after (`dxgi: ...` in `KenshiPureLoader.log`). Measured in both runs: the game asks for
+`1920x1080 ... scaling STRETCHED, windowed`, we pass UNSPECIFIED, and the picture is right (user).
 
 Fallback (`client/Display.cpp`, in KenshiPure): a worker thread waits until the game window is in front
 and answers messages (3 checks, 0.5 s apart). If the client area
