@@ -47,9 +47,8 @@ inferred (see "Evidence").
   unknown, English, for people outside the project). Its tiles live in the `data` object in the
   script. A project file only (open it in a browser), not published.
 - `docs/roadmap.html`: the user's progress view (phases and steps done / in progress / to do, what
-  they must do next; plain words). Edit only the `DATA` object in its script. Published as
-  https://claude.ai/artifact/EXspJDbM7ChGmx25BPw89e (read it with the Artifact tool, then publish
-  this file with that `url`).
+  they must do next; plain words). Edit only the `DATA` object in its script. A project file
+  only, not published.
 - `.claude/`: hooks, critics, the `critique` skill. Hook tests: `node --test .claude/hooks/*.test.js`.
 
 ## Safety with the mod
@@ -117,7 +116,7 @@ The `critique` skill (critic-builder, critic-skeptic in parallel; quick and full
 there). Run it: before a conclusion others will build on is written down as fact (both full); on a
 reimplementation or tooling plan (builder full, skeptic quick); on a `.claude/` or setup change
 (quick, full if it touches permissions, hooks or security); before anything is made public; when
-the user asks. Not for small notes, fixes or updates of the knowledge map and the private roadmap. Can't spawn them → ask the user to type `/critique`.
+the user asks. Not for small notes, fixes or updates of the knowledge map and roadmap. Can't spawn them → ask the user to type `/critique`.
 Runtime evidence outranks critics.
 
 ## Fixing problems
@@ -132,7 +131,7 @@ Runtime evidence outranks critics.
 1. Changed `.claude/hooks/`? `node --test .claude/hooks/*.test.js` passes.
 2. Fix notes the work made false; when a finding changes what is known, update the tiles in
    `docs/knowledge-map.html` and its date line; when a step's state
-   or the user's next action changes, update `docs/roadmap.html` (`DATA`, `updated`) and republish it; delete finished `WORK.md` entries; delete scratch files you made
+   or the user's next action changes, update `docs/roadmap.html` (`DATA`, `updated`); delete finished `WORK.md` entries; delete scratch files you made
    (only yours: other sessions share this checkout). A subagent that doesn't commit skips this
    step; its caller does it.
 3. Commit by path in plain English without asking: `git commit -m "<msg>" -- <files>`, never a
