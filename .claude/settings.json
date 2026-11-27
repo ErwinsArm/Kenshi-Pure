@@ -27,6 +27,16 @@
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/require-model.js\""
           }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/secret-scan.js\" claude-hook",
+            "timeout": 120
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

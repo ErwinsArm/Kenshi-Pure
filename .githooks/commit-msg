@@ -1,0 +1,11 @@
+#!/bin/sh
+# Kenshi-Pure secret scan (opt-in per clone: git config core.hooksPath .githooks; see docs/setup.md).
+# Runs .claude/hooks/secret-scan.js with Node from PATH or the portable one from scripts/setup-rea.ps1.
+root=$(git rev-parse --show-toplevel) || exit 1
+for n in node node.exe "$root/tools/rea/node/node.exe"; do
+	if command -v "$n" >/dev/null 2>&1; then
+		exec "$n" "$root/.claude/hooks/secret-scan.js" commit-msg "$@"
+	fi
+done
+echo "secret-scan: Node.js not found, so this was not checked and is blocked. Install Node.js (or run scripts/setup-rea.ps1)." >&2
+exit 1

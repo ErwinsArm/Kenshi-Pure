@@ -1,2 +1,4 @@
 # Mod files are evidence: keep them byte-exact (no line-ending conversion).
 KenshiMultiplayer*/** -text
+# Git hooks run under sh: keep LF endings on every checkout.
+.githooks/* text eol=lf

@@ -1,5 +1,23 @@
 # Setup: REA reverse-engineering toolchain
 
+## Secret scan (recommended for everyone who commits)
+
+The repo is public. `.claude/hooks/secret-scan.js` blocks a commit or push that adds API keys or
+tokens, private keys, `password=`-style values, real e-mail addresses, user-folder paths with a real
+name (`C:\Users\<name>`), your computer's user name, or files that must never be committed (the
+AnarchyKenshi mod files, its logs and `AnarchyKenshi-logins.txt`, crash dumps, archives). Commit
+author addresses are checked too, so set a GitHub noreply address (`git config user.email
+<id>+<login>@users.noreply.github.com`). Claude Code runs the check on its own git commands; it is
+best effort for wrapped commands, so also turn on the exact git hooks once per clone (needs Node.js;
+they also cover commits from other tools such as GitHub Desktop):
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+Check the whole history at any time with `node .claude/hooks/secret-scan.js history`. A false
+positive is fixed in the rules of `.claude/hooks/secret-scan.js` (with a test), not bypassed.
+
 ## The mod files
 
 The repo holds only our own work, not AnarchyKenshi. Put your own copy of the mod (v0.133.1, the
