@@ -47,7 +47,15 @@ State: M5 code committed as work in progress (builds, all 5 net tests pass incl.
   150 held (speed up to ~150 while catching up); leave -> destroy returned 1, hand gone at once; rejoin (new id 3) ->
   new body. Big gaps (~100-250) at one part of the circle (path around an obstacle on hilly ground) and "desired 15"
   between orders (the move job resets desired to the walk speed) -> fix: desired speed now held every frame.
-- Run 2 (order + held desired speed; in-world load at 100 s): running.
+- Run 2 (order + held desired speed; in-world load at 100 s): gap mean 63.3 (no change: the hold did not matter);
+  the big gaps sit at two fixed spots of the bot's circle each lap (path around obstacles; open ground gap 1-25).
+  Load: "the world changed and its hand no longer resolves" -> forgotten with no game call, new body 3 s after the
+  world was back. No fault.
+- Run 3 (steer, unit direction, AI skipped, same circle): open ground gap 0.1-3 (better than order), but stuck at the
+  obstacles (speed 0, gap up to 260): mean 88.7. (First try ignored -Cfg: PowerShell `$Cfg` == `$cfg`; fixed with `$cfgSets`.)
+- New default `remote_drive=auto` (client/Remote.cpp SetMode): steer, switch to the walk order while stuck (gap > 40
+  and speed < 20 for 0.4 s, or gap > 150), back to steer when gap < 15 for 1 s. kp-remote-test 67 checks pass.
+- Run 4 (auto): running.
 - Peer note from the user: AK is only a reference; pick the drive by measurement (smoothest, least lag).
 
 ## Next steps (in order)

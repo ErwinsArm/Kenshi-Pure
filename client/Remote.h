@@ -16,7 +16,7 @@ namespace kp
     struct RemoteConfig
     {
         int on;              // cfg remote=on|off (default on; NetFrame keeps it off while the M4 stand-in runs)
-        int drive;           // DM_ORDER (default) or DM_STEER; cfg remote_drive=order|steer
+        int drive;           // DM_AUTO (default), DM_ORDER or DM_STEER; cfg remote_drive=auto|order|steer
         char faction[64];    // string id of the bodies' faction; cfg remote_faction (default nofac = "No Faction")
         float maxSpeed;      // the body's max speed, kept every frame; cfg remote_maxspeed (default 150, 0 = its own)
         float range;         // spawn only this close (x/z) to the local character; cfg remote_range (default 3000)
@@ -79,6 +79,9 @@ namespace kp
             unsigned int lastAge;
             int spawnFails, applyFails;
             bool aiSkipped;
+            int mode;                    // the planner mode now (DM_ORDER or DM_STEER; auto switches between them)
+            unsigned long long condSince;   // auto: since when the switch condition holds (0 = not)
+            unsigned int switches;
             bool verify;                 // the world may have changed: check the hand once the world is back
             int destroyTries;
             unsigned long long downSince;
@@ -128,6 +131,7 @@ namespace kp
         void LogSummary(const Body* b, const char* why);
         bool TrySpawn(Body* b, unsigned long long nowMs);
         void Drive(Body* b, unsigned long long nowMs);
+        void SetMode(Body* b, int mode, bool halt);
 
         RemoteConfig cfg_;
         IGameAccess* game_;

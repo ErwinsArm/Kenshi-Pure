@@ -350,7 +350,7 @@ namespace kp
                 Log("remote: off (row %s is unresolved for this build)", g_sites[need[i]].name);
                 return false;
             }
-        if (cfg.drive == DM_STEER && !AiSkipInstall())
+        if (cfg.drive != DM_ORDER && !AiSkipInstall())   // steer and auto skip the AI while steering
         {
             Log("remote: off (the AI-skip detour could not be installed)");
             return false;

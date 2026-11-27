@@ -29,7 +29,7 @@ namespace kp
     {
         memset(cfg, 0, sizeof(*cfg));
         cfg->on = 1;
-        cfg->drive = DM_ORDER;
+        cfg->drive = DM_AUTO;
         strcpy_s(cfg->faction, sizeof(cfg->faction), "nofac");
         cfg->maxSpeed = 150.0f;
         cfg->range = 3000.0f;
@@ -55,7 +55,8 @@ namespace kp
                 }
                 else if (strcmp(key, "remote_drive") == 0)
                 {
-                    if (strcmp(val, "order") == 0) cfg->drive = DM_ORDER;
+                    if (strcmp(val, "auto") == 0) cfg->drive = DM_AUTO;
+                    else if (strcmp(val, "order") == 0) cfg->drive = DM_ORDER;
                     else if (strcmp(val, "steer") == 0) cfg->drive = DM_STEER;
                 }
                 else if (strcmp(key, "remote_faction") == 0)
@@ -131,6 +132,9 @@ namespace kp
         b->lastAge = 0;
         b->spawnFails = b->applyFails = 0;
         b->aiSkipped = false;
+        b->mode = DM_ORDER;
+        b->condSince = 0;
+        b->switches = 0;
         b->verify = false;
         b->destroyTries = 0;
         b->downSince = 0;
@@ -192,9 +196,9 @@ namespace kp
         }
         float n = (float)s.samples;   // kp-not-game: RemoteBodyStats
         Logf("remote: body of %s (%u) removed (%s): %u frames, gap to target mean %.1f max %.1f, lag to newest mean %.1f "
-             "max %.1f, body moving %.0f%%, speed while the remote moves %.1f, snaps %u, orders %u, down %u frames",
+             "max %.1f, body moving %.0f%%, speed while the remote moves %.1f, snaps %u, orders %u, down %u frames, mode switches %u",
              b->name, b->id, why, s.samples, s.gapSum / n, s.gapMax, s.lagSum / n, s.lagMax, 100.0f * (float)s.moving / n,
-             s.speedSamples ? s.speedSum / (float)s.speedSamples : 0.0f, s.snaps, s.orders, s.down);
+             s.speedSamples ? s.speedSum / (float)s.speedSamples : 0.0f, s.snaps, s.orders, s.down, b->switches);
     }
 
     void RemoteBodies::Remove(Body* b, unsigned long long nowMs, const char* why)
@@ -286,7 +290,7 @@ namespace kp
                 ++kept;
                 ++kept_;
                 b->track.Clear();   // poses from before the gap would drive it into the past
-                b->planner.Reset(cfg_.drive, cfg_.snapDist);
+                SetMode(b, b->mode, true);
                 continue;
             }
             if (b->state == RB_LIVE) LogSummary(b, "the world changed and its hand no longer resolves to it");
@@ -397,15 +401,25 @@ namespace kp
         b->lastStatus = 0;
         memset(&b->stats, 0, sizeof(b->stats));
         memset(&b->lastCmd, 0, sizeof(b->lastCmd));
-        b->planner.Reset(cfg_.drive, cfg_.snapDist);
-        // Steer drives the body directly (AK's way): its AI is skipped. Order hands the walk to its AI's
-        // move job, so the AI stays on (M4: skipping it stalled the order).
-        b->aiSkipped = cfg_.drive == DM_STEER;
-        game_->RemoteSkipAi(b->slot, b->aiSkipped);
+        b->switches = 0;
+        SetMode(b, cfg_.drive == DM_AUTO ? DM_STEER : cfg_.drive, true);
+        b->switches = 0;
         Logf("remote: spawned a body for %s (%u) at %.1f %.1f %.1f, faction %s%s, drive %s, AI %s", b->name, b->id, s.pos[0],
              s.pos[1], s.pos[2], info.faction, info.factionAsAsked ? "" : " (NOT the one asked for)", DriveModeName(cfg_.drive),
              b->aiSkipped ? "skipped" : "on");
         return true;
+    }
+
+    // Steer drives the body directly: its AI is skipped. Order hands the walk to its AI's move job, so the AI
+    // stays on (M4: skipping it stalled the order).
+    void RemoteBodies::SetMode(Body* b, int mode, bool halt)
+    {
+        b->mode = mode;
+        b->condSince = 0;
+        b->planner.Reset(mode, cfg_.snapDist, halt);
+        b->aiSkipped = mode == DM_STEER;
+        game_->RemoteSkipAi(b->slot, b->aiSkipped);
+        ++b->switches;
     }
 
     void RemoteBodies::Drive(Body* b, unsigned long long nowMs)
@@ -414,7 +428,7 @@ namespace kp
         memset(&st, 0, sizeof(st));
         // Order: the move job puts the desired speed back to the walk speed between our orders (run 1: desired 15
         // between walks, speed dropping to ~10), so the asked speed is held every frame.
-        float want = cfg_.drive == DM_ORDER && b->lastCmd.kind == DC_WALK ? b->lastCmd.speed : 0.0f;
+        float want = b->mode == DM_ORDER && b->lastCmd.kind == DC_WALK ? b->lastCmd.speed : 0.0f;
         if (!game_->RemoteUpdate(b->slot, cfg_.maxSpeed, want, &st))
         {
             // Gone without us (the game removed it: zone unload, ...) or the hand resolves to someone else.
@@ -442,6 +456,17 @@ namespace kp
         if (paused_) return;   // nothing moves; the game drops teleports while paused (M4)
         TrackSample target, newest;
         if (!b->track.At(nowMs - DrivePlanner::kRenderDelayMs, &target) || !b->track.At(nowMs, &newest)) return;
+        if (cfg_.drive == DM_AUTO)
+        {
+            // Auto (runs 1-3: steer follows open ground within ~1 unit but sticks at obstacles; the walk order's
+            // path goes around them): steer, and walk with the path while the body is stuck, back once it is close.
+            bool cond = b->mode == DM_STEER ? (b->lastGap > 40.0f && st.speed < 20.0f) || b->lastGap > 150.0f
+                                            : b->lastGap < 15.0f;
+            unsigned long long hold = b->mode == DM_STEER ? 400 : 1000;
+            if (!cond) b->condSince = 0;
+            else if (b->condSince == 0) b->condSince = nowMs;
+            else if (nowMs - b->condSince >= hold) SetMode(b, b->mode == DM_STEER ? DM_ORDER : DM_STEER, false);
+        }
         DriveCmd c = b->planner.Step(nowMs, st, target, &b->lastGap);
         b->lastLag = DistXZ(st.pos, newest.pos);
         RemoteBodyStats& s = b->stats;
@@ -462,7 +487,7 @@ namespace kp
         if (c.kind != DC_NONE)
         {
             b->lastCmd = c;
-            if (game_->RemoteApply(b->slot, c, cfg_.drive)) b->applyFails = 0;
+            if (game_->RemoteApply(b->slot, c, b->mode)) b->applyFails = 0;
             else if (++b->applyFails >= kMaxApplyFails)
             {
                 Remove(b, nowMs, "game calls faulted 3 times in a row");
@@ -475,7 +500,7 @@ namespace kp
             b->lastStatus = nowMs;
             Logf("remote: %s (%u) %s body %.1f %.1f %.1f target %.1f %.1f %.1f gap %.1f lag %.1f speed %.1f (asked %.1f, "
                  "desired %.1f, max %.1f, orders %d) moving %d%s last %s",
-                 b->name, b->id, DriveModeName(cfg_.drive), st.pos[0], st.pos[1], st.pos[2], target.pos[0], target.pos[1],
+                 b->name, b->id, DriveModeName(b->mode), st.pos[0], st.pos[1], st.pos[2], target.pos[0], target.pos[1],
                  target.pos[2], b->lastGap, b->lastLag, st.speed, b->lastCmd.speed, st.desired, st.maxSpeed, st.speedOrders,
                  st.moving, st.down ? " DOWN" : "",
                  b->lastCmd.kind == DC_WALK ? "walk" : b->lastCmd.kind == DC_STEER ? "steer" : b->lastCmd.kind == DC_SNAP

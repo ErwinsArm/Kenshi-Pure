@@ -31,6 +31,7 @@ param(
     [switch]$SaveCopy
 )
 $ErrorActionPreference = "Stop"
+$cfgSets = $Cfg   # PowerShell names ignore case: $cfg below is kenshi.cfg and would overwrite -Cfg
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $mod = Join-Path $GameDir "mods\KenshiPure"
 $cfg = Join-Path $GameDir "kenshi.cfg"
@@ -79,7 +80,7 @@ try {
     # KenshiPure.cfg for this run (back in finally).
     Copy-Item $kpCfg $kpBackup -Force
     $sets = @{}
-    foreach ($kv in ($Cfg -split ";")) { if ($kv -match "^\s*([^=]+?)\s*=(.*)$") { $sets[$Matches[1]] = $Matches[2].Trim() } }
+    foreach ($kv in ($cfgSets -split ";")) { if ($kv -match "^\s*([^=]+?)\s*=(.*)$") { $sets[$Matches[1]] = $Matches[2].Trim() } }
     $lines = @()
     foreach ($l in @(Get-Content $kpCfg)) {
         if ($l -match "^\s*([^=#]+?)\s*=") {

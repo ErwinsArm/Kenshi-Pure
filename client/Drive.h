@@ -12,7 +12,7 @@ namespace kp
 {
     // path: CharMovement::setDestination (the movement controller); order: Character::setDestination (the
     // click-to-move order, a TASK_MOVE job ticked by the AI); steer: setDirectMovement each frame.
-    enum DriveMode { DM_OFF = 0, DM_PLACE, DM_PATH, DM_ORDER, DM_STEER, DM_CYCLE };
+    enum DriveMode { DM_OFF = 0, DM_PLACE, DM_PATH, DM_ORDER, DM_STEER, DM_CYCLE, DM_AUTO };   // DM_AUTO: M5 bodies only
     enum DriveAiSkip { DA_NONE = 0, DA_AI, DA_CHARACTER };
 
     struct DriveConfig
@@ -106,7 +106,7 @@ namespace kp
         };
         DrivePlanner();
         // New mode (or the same one again): the next Step halts the body once, stats start over.
-        void Reset(int mode, float snapDist);
+        void Reset(int mode, float snapDist, bool halt = true);
         int Mode() const { return mode_; }
         // One frame: the command for the body. gap (x/z distance body -> target) is returned too.
         DriveCmd Step(unsigned long long nowMs, const BodyState& body, const TrackSample& target, float* gap);

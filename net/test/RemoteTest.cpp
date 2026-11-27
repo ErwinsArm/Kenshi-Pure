@@ -296,14 +296,14 @@ namespace
     {
         RemoteConfig c;
         RemoteParseConfig("", &c);
-        CHECK(c.on == 1 && c.drive == DM_ORDER && std::strcmp(c.faction, "nofac") == 0 && c.maxSpeed == 150.0f);
+        CHECK(c.on == 1 && c.drive == DM_AUTO && std::strcmp(c.faction, "nofac") == 0 && c.maxSpeed == 150.0f);
         CHECK(c.range == 3000.0f && c.settleMs == 3000 && c.squadPermanent == 1 && c.snapDist == 300.0f && c.saveGuard == 1);
         RemoteParseConfig("remote=off\nremote_drive=steer\nremote_faction= Drifters \nremote_maxspeed=0\nremote_range=500\n"
                           "remote_settle=10\nremote_squad_permanent=0\nremote_snap=150\nremote_save_guard=off\n", &c);
         CHECK(c.on == 0 && c.drive == DM_STEER && std::strcmp(c.faction, "Drifters") == 0 && c.maxSpeed == 0.0f);
         CHECK(c.range == 500.0f && c.settleMs == 10000 && c.squadPermanent == 0 && c.snapDist == 150.0f && c.saveGuard == 0);
         RemoteParseConfig("remote=maybe\nremote_drive=fly\nremote_maxspeed=5\nremote_range=1\nremote_settle=-3\n#remote=off\n", &c);
-        CHECK(c.on == 1 && c.drive == DM_ORDER && c.maxSpeed == 150.0f && c.range == 3000.0f && c.settleMs == 3000);
+        CHECK(c.on == 1 && c.drive == DM_AUTO && c.maxSpeed == 150.0f && c.range == 3000.0f && c.settleMs == 3000);
     }
 
     void TestLifecycle()
@@ -553,6 +553,27 @@ namespace
             CHECK(g.Logged("removed (out of range)") && g.spawns == RemoteBodies::kMaxBodies + 1);
             nf.Stop();
             CHECK(g.bodies.empty());
+            g_core.poses.clear();
+        }
+        {   // auto: steers first (AI skipped); a body that does not move under steering (the fake ignores steer, as a body
+            // stuck at a rock) switches to the walk order with its AI on, and back to steering once it is close
+            FakeGame g;
+            NetFrame nf;
+            nf.SetRemote(Cfg(DM_AUTO));
+            CHECK(nf.Start(&api, cc, &g));
+            Walker w(7);
+            std::vector<Walker*> ws(1, &w);
+            PushEvent(KP_EV_JOINED, 7, "bob");
+            Run(nf, g, now, 3300, ws);
+            const RemoteBodies::Body* b = nf.Bodies().Find(7);
+            CHECK(b && b->state == RemoteBodies::RB_LIVE && b->mode == DM_STEER && g.bodies[0].aiSkip);
+            Run(nf, g, now, 3000, ws);
+            b = nf.Bodies().Find(7);
+            CHECK(b && b->switches >= 1 && g.Count(DC_WALK) > 0);
+            Run(nf, g, now, 20000, ws);
+            b = nf.Bodies().Find(7);
+            CHECK(b && b->switches >= 2);   // close again: back to steering at least once
+            nf.Stop();
             g_core.poses.clear();
         }
         {   // paused: no commands, bodies kept

@@ -53,6 +53,7 @@ namespace kp
         case DM_ORDER: return "order";
         case DM_STEER: return "steer";
         case DM_CYCLE: return "cycle";
+        case DM_AUTO: return "auto";
         default: return "?";
         }
     }
@@ -187,11 +188,11 @@ namespace kp
 
     DrivePlanner::DrivePlanner() { Reset(DM_OFF, 300.0f); }
 
-    void DrivePlanner::Reset(int mode, float snapDist)
+    void DrivePlanner::Reset(int mode, float snapDist, bool halt)
     {
         mode_ = mode;
         snapDist_ = snapDist;
-        haltPending_ = true;
+        haltPending_ = halt;
         halted_ = false;
         haveOrder_ = false;
         memset(orderPos_, 0, sizeof(orderPos_));
