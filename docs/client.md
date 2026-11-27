@@ -274,8 +274,9 @@ still connect (no authentication), so keep writes off when not testing.
 
 Separate, optional `KenshiPureCheats.dll` (sources `client/cheats/`; host side `client/CheatHost.cpp`,
 interface `client/CheatApi.h`). Installed only with `install-client.ps1 -Cheats` (a plain install removes
-it); without the file KenshiPure logs `cheat: not installed` and nothing changes. Built and compile-checked;
-**not yet run in game**.
+it); without the file KenshiPure logs `cheat: not installed` and nothing changes. The user's run on 1.0.65
+(Steam, with RE_Kenshi) passed: window shown in game, every button worked as the user saw it, and
+`KenshiPureCheats.log` agrees (below).
 
 - KenshiPure loads the DLL in `kpStart` if it is next to it, calls `kpCheatStart` (exe path and hash) and
   `kpCheatFrame` from its frame listener. The DLL resolves its own copy of the address table (same
@@ -309,9 +310,13 @@ it); without the file KenshiPure logs `cheat: not installed` and nothing changes
   `unconcious` (`+0x161`) when `knockoutTimer` (`+0xA0`) is above a threshold, among other triggers
   (blood, a part's collapse stage, hunger). It runs from the periodic medical update, not every frame, so
   the fall may come a moment later; the timer's unit is not measured.
-- Not checked yet (needs a run): whether clicks on the window also reach the game world, text fitting at
-  other UI scales, whether Ctrl+Shift+C does something in Kenshi too.
-- Single-player only by intent: nothing stops it in a multiplayer session yet (needed before M3 is used with
+- In game (**M**, user's run on 1.0.65): damage, heal, knock out (timer 20) on the selected character; Katana
+  made through the weapon maker, 1 in the inventory; Samurai Armour and Bread x2 land in the inventory,
+  later Armour x2 all on the ground; Bread x100 gave 1 in the inventory and 99 on the ground (a full bag is
+  **I**); teleport to camera centre lands on target (0.0 x/z after 1 s). The user saw no problem.
+- Not checked yet: the same on 1.0.68, text fitting at other UI scales, whether Ctrl+Shift+C does something
+  in Kenshi too.
+- Single-player only by intent: nothing stops it in a multiplayer session yet (needed before playing with
   others).
 
 ## The probe's three bugs: causes and fixes
@@ -348,7 +353,7 @@ rules above); their callees (`tryAddItem`, the section's `addItem`, ...) were no
    the move is **I**. Fix: `Character::teleport`. Check (log only): the position right after the teleport
    and again after 1 s of running game, with the distance to the target.
 
-## Test steps for the user (after M3, with the game free)
+## Test steps for the user
 
 1. Claude installs the new build with the cheats (`install-client.ps1 -Cheats`); nothing to type.
 2. Start Kenshi and load a save. The "KenshiPure cheats" window appears; select one of your characters
