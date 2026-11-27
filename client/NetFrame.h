@@ -57,7 +57,7 @@ namespace kp
         // ForgetAll drop hands without any game call.
         virtual bool RemoteSpawn(const RemoteConfig& /*cfg*/, const char* /*playerName*/, const float* /*pos*/, float /*yaw*/,
                                  RemoteSpawnInfo* /*out*/) { return false; }
-        virtual bool RemoteUpdate(int /*slot*/, float /*maxSpeed*/, BodyState* /*out*/) { return false; }
+        virtual bool RemoteUpdate(int /*slot*/, float /*maxSpeed*/, float /*wantSpeed*/, BodyState* /*out*/) { return false; }
         virtual bool RemoteApply(int /*slot*/, const DriveCmd& /*cmd*/, int /*mode*/) { return false; }
         virtual void RemoteSkipAi(int /*slot*/, bool /*on*/) {}
         virtual bool RemoteDestroy(int /*slot*/, const char* /*reason*/) { return false; }

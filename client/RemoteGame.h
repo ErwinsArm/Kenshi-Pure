@@ -9,7 +9,8 @@ namespace kp
     // Checks the rows, installs the AI-skip detour (steer) and the save guard. false (logged): remote bodies off.
     bool RemoteGameInit(const RemoteConfig& cfg);
     bool RemoteGameSpawn(const RemoteConfig& cfg, const char* playerName, const float* pos, float yaw, RemoteSpawnInfo* out);
-    bool RemoteGameUpdate(int slot, float maxSpeed, BodyState* out);
+    // wantSpeed > 0: hold that desired speed (speed orders RUN) every frame.
+    bool RemoteGameUpdate(int slot, float maxSpeed, float wantSpeed, BodyState* out);
     bool RemoteGameApply(int slot, const DriveCmd& cmd, int mode);
     void RemoteGameSkipAi(int slot, bool on);
     bool RemoteGameDestroy(int slot, const char* reason);

@@ -45,7 +45,7 @@ namespace
         {
             return kp::RemoteGameSpawn(cfg, name, pos, yaw, out);
         }
-        bool RemoteUpdate(int slot, float maxSpeed, kp::BodyState* out) { return kp::RemoteGameUpdate(slot, maxSpeed, out); }
+        bool RemoteUpdate(int slot, float maxSpeed, float wantSpeed, kp::BodyState* out) { return kp::RemoteGameUpdate(slot, maxSpeed, wantSpeed, out); }
         bool RemoteApply(int slot, const kp::DriveCmd& cmd, int mode) { return kp::RemoteGameApply(slot, cmd, mode); }
         void RemoteSkipAi(int slot, bool on) { kp::RemoteGameSkipAi(slot, on); }
         bool RemoteDestroy(int slot, const char* reason) { return kp::RemoteGameDestroy(slot, reason); }

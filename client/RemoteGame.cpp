@@ -169,7 +169,7 @@ namespace
     }
 
     // State, max speed and the AI-skip pointer of a verified body.
-    bool UpdateBody(Character* c, int slot, float maxSpeed, kp::BodyState* out)
+    bool UpdateBody(Character* c, int slot, float maxSpeed, float wantSpeed, kp::BodyState* out)
     {
         __try
         {
@@ -187,6 +187,11 @@ namespace
                 AnimationClass* an = c->getAnimationClass();
                 if (an) an->setMaximumSpeed(maxSpeed);
                 KP_FIELD(m, AbstractMovementBase, maxSpeed) = maxSpeed;
+            }
+            if (wantSpeed > 0.0f && KP_FIELD(m, AbstractMovementBase, desiredSpeed) != wantSpeed)
+            {
+                cm->setDesiredSpeedOrders(RUN);
+                cm->setDesiredSpeed(wantSpeed);
             }
             out->speed = KP_FIELD(m, AbstractMovementBase, currentSpeed);
             out->moving = KP_FIELD(m, AbstractMovementBase, currentlyMoving) ? 1 : 0;
@@ -426,10 +431,10 @@ namespace kp
         return true;
     }
 
-    bool RemoteGameUpdate(int slot, float maxSpeed, BodyState* out)
+    bool RemoteGameUpdate(int slot, float maxSpeed, float wantSpeed, BodyState* out)
     {
         Character* c = Resolve(slot);
-        if (!c || g_slots[slot].destroyed || !Identity(c, g_slots[slot]) || !UpdateBody(c, slot, maxSpeed, out))
+        if (!c || g_slots[slot].destroyed || !Identity(c, g_slots[slot]) || !UpdateBody(c, slot, maxSpeed, wantSpeed, out))
         {
             if (slot >= 0 && slot < KP_SKIP_REMOTE) AiSkipSet(1 + slot, NULL);
             return false;

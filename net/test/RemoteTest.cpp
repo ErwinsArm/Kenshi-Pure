@@ -134,7 +134,7 @@ namespace
             std::map<int, FakeBody>::iterator it = bodies.find(slot);
             return it == bodies.end() ? 0 : &it->second;
         }
-        bool RemoteUpdate(int slot, float maxSpeed, BodyState* out)
+        bool RemoteUpdate(int slot, float maxSpeed, float, BodyState* out)
         {
             Call();
             FakeBody* b = Get(slot);

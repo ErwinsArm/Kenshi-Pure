@@ -412,7 +412,10 @@ namespace kp
     {
         BodyState st;
         memset(&st, 0, sizeof(st));
-        if (!game_->RemoteUpdate(b->slot, cfg_.maxSpeed, &st))
+        // Order: the move job puts the desired speed back to the walk speed between our orders (run 1: desired 15
+        // between walks, speed dropping to ~10), so the asked speed is held every frame.
+        float want = cfg_.drive == DM_ORDER && b->lastCmd.kind == DC_WALK ? b->lastCmd.speed : 0.0f;
+        if (!game_->RemoteUpdate(b->slot, cfg_.maxSpeed, want, &st))
         {
             // Gone without us (the game removed it: zone unload, ...) or the hand resolves to someone else.
             LogSummary(b, "its hand no longer resolves to it");

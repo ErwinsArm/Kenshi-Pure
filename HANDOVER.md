@@ -42,7 +42,13 @@ State: M5 code committed as work in progress (builds, all 5 net tests pass incl.
 - Version 0.0.6-m5 (plugin and core; the core version is no longer a CMake cache entry). Installed with install-client.ps1.
 
 ## In-game runs (log what each showed here)
-- Run 1 (order drive, join / walk / bot leaves at 130 s / rejoins at 170 s): running.
+- Run 1 (order drive, bot 60 units/s, leaves at 130 s, rejoins at 170 s): body "[KP] bot" built, faction "No Faction"
+  as asked, walked the circle 97 % of the time, gap to target mean 62.5 / max 277 (M4: 107 / 368), 0 snaps, max speed
+  150 held (speed up to ~150 while catching up); leave -> destroy returned 1, hand gone at once; rejoin (new id 3) ->
+  new body. Big gaps (~100-250) at one part of the circle (path around an obstacle on hilly ground) and "desired 15"
+  between orders (the move job resets desired to the walk speed) -> fix: desired speed now held every frame.
+- Run 2 (order + held desired speed; in-world load at 100 s): running.
+- Peer note from the user: AK is only a reference; pick the drive by measurement (smoothest, least lag).
 
 ## Next steps (in order)
 1. Finish the in-game runs: run 1 above; steer vs order (`-Cfg "remote_drive=steer"`); a load in the world
