@@ -206,7 +206,10 @@ extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
         kp::Log("AnarchyKenshi is loaded in this game - staying inactive (switch it off for KenshiPure runs)");
         return 0;
     }
-    kp::DisplayFixStart();  // fallback minimize-restore; acts only if the picture is still the wrong size
+    // Fallback minimize-restore only when the loader could not arm the early DXGI fix (measured in the
+    // first loader run: started this early it found no real window yet and minimized nothing useful).
+    if (!host->displayHook) kp::DisplayFixStart();
+    else kp::Log("display: early DXGI fix armed by the loader - no minimize-restore fallback");
     if (!BuildCheck(host)) return 0;
     if (!kp::SitesKnownBuild())
     {

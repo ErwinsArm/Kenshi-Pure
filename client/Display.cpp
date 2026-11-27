@@ -124,7 +124,9 @@ namespace
         {
             Sleep(500);
             w = GameWindow();
-            if (w && GetForegroundWindow() == w && !IsIconic(w) && Responsive(w)) ++good;
+            RECT cr = { 0 };
+            bool sized = w && GetClientRect(w, &cr) && cr.right > 0 && cr.bottom > 0;   // a real game window
+            if (sized && GetForegroundWindow() == w && !IsIconic(w) && Responsive(w)) ++good;
             else good = 0;
         }
         if (!w) { kp::Log("display: game window not found - no minimize-restore"); return 0; }
