@@ -149,7 +149,7 @@ log read): G8, G6, G13 closed. Details and evidence: [kenshi-build.md](findings/
 - Not done: where crash dumps go (Kenshi writes `crashDump<ver>_x64.dmp` in the game folder, **M**;
   Windows LocalDumps not checked).
 
-**M1 – read own position** (M; needs G1, G2, G6, G8) — **built, waiting for the user's run**; what is read and from where: [client.md](client.md) "Own pose (M1)"
+**M1 – read own position** (M; needs G1, G2, G6, G8) — **done** (user's run, log read): position, yaw, velocity (`currentMotion`, units per second, length = `currentSpeed`) and `currentlyMoving` behave as below; reads, sources and results: [client.md](client.md) "Own pose (M1)"
 - Each frame in a loaded world: find the local character, read position, yaw, velocity, walking;
   log once a second. Uses the verified calling-convention sheet (G2).
 - Without the game: unit tests (quaternion→yaw, finite checks, rate limiter).

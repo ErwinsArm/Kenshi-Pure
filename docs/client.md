@@ -82,30 +82,35 @@ may already have hooked a function in memory, and the file's SHA-256 names the b
 # Client: own pose (M1)
 
 Source: `client/Pose.cpp`, pure helpers `client/PoseMath.h` (unit tests `client/test/PoseMathTest.cpp`,
-run by `build-plugin.ps1`). Built and installed; **not yet run in game**.
+run by `build-plugin.ps1`). Run in game (**M**, the user's run on 1.0.65 with RE_Kenshi, character Gecko,
+1 owned): stand, walk with move orders, turn, game speed ×5, pause, menu and save load; no fault, the
+game kept running.
 
 - Every 100 ms on the frame thread (after the game's frame): the local character is the player's
   selected character if it is one of `PlayerInterface::playerCharacters`, else the first of them; none
-  (menu, loading) → `pose: no own character`. A change of character gets its own log line.
+  (menu, loading) → `pose: no own character`. A change of character gets its own log line. Only one
+  owned character was tested.
 - Read (all in `__try`, plain copies; rows of feature `optional:pose` plus the probe's
   `selectedCharacter`, `hand::getCharacter`, `Character::getMovement`, `getName`/`getPosition` vslots;
   any unresolved → `pose: off`):
 
-| Value | Source | How known |
+| Value | Source | What the run showed (**M**) |
 |---|---|---|
-| position | virtual `Character::getPosition()` | probe runs (**M**) |
-| orientation | virtual `RootObject::getOrientation()` (slot 0xC0, not overridden in Character's vtable) | its body copies 4 floats at `this+0xB0..0xBC` into the out-quaternion (**M**, 1.0.65 disassembly); that they are the body's rotation is **I** |
-| yaw | rotated +Z axis of the quaternion, `atan2(2(xz+wy), 1-2(x²+y²))`, degrees; 0 = +z, 90 = +x | AK's formula (protocol.md, **M**); tests |
-| facing, motion, speed, wanted speed, moving, destination, path destination | `AbstractMovementBase` fields `direction` 0xD0, `currentMotion` 0xA8, `currentSpeed` 0xB8, `desiredSpeed` 0xBC, `currentlyMoving` 0x24, `destination` 0xDC, `pathDestination` 0xE8, through `Character::getMovement()` | offsets proven in both builds (sites.tsv); meanings and units are KenshiLib's names (**I**) |
-| walking | x/z distance² from position to path destination > 4 | AK's rule (+0xE8 is AK's "destination", **M**) |
-| step/s | x/z distance between two logged samples per real second | our own cross-check for the velocity unit |
+| position | virtual `Character::getPosition()` | x/z follow the walk; y settles onto the ground after a load (1542.8 → 1536.2) |
+| orientation, yaw | virtual `RootObject::getOrientation()` (slot 0xC0, not overridden in Character's vtable; copies 4 floats at `this+0xB0..0xBC`); yaw = heading of the rotated +Z axis, `atan2(2(xz+wy), 1-2(x²+y²))`, 0 = +z, 90 = +x (AK's formula) | (sin, cos) of yaw equals `facing` x/z to 2 decimals in every sample checked (74.4°, -158°, -17.9°, 91.7°), and the direction of `motion` while walking |
+| facing | `AbstractMovementBase::direction` 0xD0 | unit vector; small y on slopes |
+| velocity | `AbstractMovementBase::currentMotion` 0xA8 | 0 standing; while walking a vector in world units per second whose length equals `currentSpeed`; at game speed ×1 the logged position moved 71.9 units in a second at speed 72.1 |
+| speed | `AbstractMovementBase::currentSpeed` 0xB8 | 0 standing, ~72 walking (Gecko), lower while starting or turning |
+| moving | `AbstractMovementBase::currentlyMoving` 0x24 | 1 exactly while speed > 0 |
+| wanted speed | `AbstractMovementBase::desiredSpeed` 0xBC | 45 after a load, 999 after the first move order (meaning of 999 **I**: no limit) |
+| destination, path destination | `destination` 0xDC, `pathDestination` 0xE8 | both equal the clicked target during a move order and the position when standing; never different in this run |
+| walking | x/z distance² from position to path destination > 4 (AK's rule) | lags `moving`: 1 for one sample after arriving 3 units short of the target; `moving` is the better flag |
 
+- While paused every value stays frozen (`paused` in the line). At ×5 speed the position moved faster
+  than `speed` per real second, so speed and velocity are per game second (**I**, short walks only).
 - Log: once a second `pose: <name> pos … yaw … facing … motion … speed … want … moving … walking … dest …
-  path … step/s …` (`paused` appended while paused). Non-finite or huge values (> 1e7) skip the sample
-  (logged at most every 10 s).
-- Open until the run: which field is the velocity and in what unit (compare `motion`/`speed` with
-  `step/s`), whether `facing` and yaw agree, and whether `destination` or `pathDestination` follows a
-  move order.
+  path … step/s …`; `step/s` is the x/z distance between two logged samples per real second. Non-finite
+  or huge values (> 1e7) skip the sample (logged at most every 10 s).
 
 # Client: live game probe
 
