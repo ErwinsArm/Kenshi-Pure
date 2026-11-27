@@ -109,7 +109,7 @@ h2{font-size:1.25rem}
 const DATA = {
   updated: "27 November 2026",
   now: "Building our own starter (M0b): the mod will start by itself on every Kenshi version, without RE_Kenshi. Then M1.",
-  you: "Nothing right now. AnarchyKenshi is switched back on. When a step needs a test in the game, Claude tells you exactly what to do.",
+  you: "Nothing right now. The starter is built in its own session; when it needs a test in the game (RE_Kenshi on and off), Claude tells you exactly what to do.",
   phases: [
     {name:"Learn from the old mod", note:"Read AnarchyKenshi to learn how a Kenshi multiplayer works. We only look; we never copy or run its files.", steps:[
       {tag:"L1", name:"How it talks to the server", status:"done", d:"All ~60 message types and the login are known."},
@@ -124,7 +124,7 @@ const DATA = {
     ]},
     {name:"Build: two players see each other walk", note:"The first playable version, in small steps. Each step is tested before the next one starts.", steps:[
       {tag:"M0", name:"Our mod starts in Kenshi", status:"done", d:"Tested by you: the mod loads, checks your game version (1.0.65), runs in every frame and reads values from the game without errors, also across a new game and a reload."},
-      {tag:"M0b", name:"Our own starter, no RE_Kenshi needed", status:"now", d:"The mod starts by itself, early, on Steam's normal Kenshi (1.0.68) and on 1.0.65, with or without RE_Kenshi, like AnarchyKenshi. Also fixes the stretched full-screen picture. Built like AnarchyKenshi: it finds the game's functions itself and checks every find. Plan checked twice by two critics (docs/plan-own-loader.md); several weeks of work."},
+      {tag:"M0b", name:"Our own starter, no RE_Kenshi needed", status:"now", d:"The mod starts by itself, early, on Steam's normal Kenshi (1.0.68) and on 1.0.65, with or without RE_Kenshi, like AnarchyKenshi. Also fixes the stretched full-screen picture. Built like AnarchyKenshi: it finds the game's functions itself and checks every find. Plan checked twice by two critics (docs/plan-own-loader.md). Steps: toolchain, address finder for 1.0.65, then 1.0.68, own starter with the picture fix, test runs by you."},
       {tag:"M1", name:"Read your own position", status:"todo", d:"The mod knows where your character stands and where it walks."},
       {tag:"M2", name:"Our own small server", status:"todo", d:"A small program on your PC that passes positions between players, plus a test bot."},
       {tag:"M3", name:"Send and receive positions", status:"todo", d:"Your game and the server talk to each other while you play."},
