@@ -84,7 +84,12 @@ may already have hooked a function in memory, and the file's SHA-256 names the b
 Source: `client/Pose.cpp`, pure helpers `client/PoseMath.h` (unit tests `client/test/PoseMathTest.cpp`,
 run by `build-plugin.ps1`). Run in game (**M**, the user's run on 1.0.65 with RE_Kenshi, character Gecko,
 1 owned): stand, walk with move orders, turn, game speed ×5, pause, menu and save load; no fault, the
-game kept running.
+game kept running. Second PC (**M**, a tester's log, same build 0.0.3-m1): Steam 1.0.68 without RE_Kenshi,
+64/65 rows (`inventory` off), ~4 min of walking with the same behaviour (speed ~70 while walking, yaw =
+facing, 0 standing); no fault.
+- First sample after a load can be half set up (**M**, second PC): destination and path destination
+  0/0/0 (so `walking` 1) and a yaw (147.5) that does not match `facing` (0, 0, 1); the next sample, 1 s
+  later, was consistent. M3 should drop poses until destination is non-zero or skip the first sample.
 
 - Every 100 ms on the frame thread (after the game's frame): the local character is the player's
   selected character if it is one of `PlayerInterface::playerCharacters`, else the first of them; none
