@@ -106,8 +106,8 @@ Every subagent and started session names `model` and `effort` (a hook checks).
   foreground subagent instead. One `start_session` per message, never in parallel.
 - A handed-off job stays in its area: `.claude/`, `CLAUDE.md` and `scripts/` only if its brief
   says so, else a `WORK.md` line. Notes, the knowledge map and the roadmap are every session's.
-- Past ~200k context (a hook warns), suggest a fresh session for new work, after the findings and
-  `WORK.md` hold what it needs.
+- Past ~300k context (a hook warns; a guideline, not a stop: finish the current task), suggest a
+  fresh session for new work, after the findings and `WORK.md` hold what it needs.
 - Subagents past 250k get a hand-over request, past 500k only git and the note (context guard).
 
 ## Critic review

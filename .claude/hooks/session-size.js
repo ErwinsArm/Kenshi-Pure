@@ -1,7 +1,7 @@
 // Claude Code UserPromptSubmit hook (.claude/settings.json): warns when the main session's history is
 // large, since every new message re-reads all of it. Taken from the Roblox project's hub hook (its
 // size check only). Subagents are capped separately by context-guard.js.
-//   history <= LIMIT (200k) -> silent
+//   history <= LIMIT (300k; a fresh session reportedly starts near 100k; override with SESSION_SIZE_LIMIT) -> silent
 //   history >  LIMIT        -> one line: suggest a fresh session for new work
 // History size = the newest assistant message's input + cache tokens in the transcript (path from the
 // hook's stdin), read from a growing tail. Never blocks a prompt: an error is one printed line, exit 0.
@@ -9,7 +9,7 @@
 
 const fs = require("fs");
 
-const LIMIT = Number(process.env.SESSION_SIZE_LIMIT) > 0 ? Number(process.env.SESSION_SIZE_LIMIT) : 200000;
+const LIMIT = Number(process.env.SESSION_SIZE_LIMIT) > 0 ? Number(process.env.SESSION_SIZE_LIMIT) : 300000;
 const TAILS = [512 * 1024, 8 * 1024 * 1024, Infinity];
 
 function readTail(file, bytes) {
@@ -48,8 +48,9 @@ function noteFor(size) {
 	if (size === null || size <= LIMIT) return null;
 	return (
 		`Session size: ~${Math.round(size / 1000)}k tokens (over ~${Math.round(LIMIT / 1000)}k). Each new message re-reads all of it. ` +
-		"If you haven't said so yet this session, tell the user in one line: start a fresh session for new work " +
-		"(after writing what it needs into the findings notes or a hand-over note). " +
+		"A guideline, not a stop: finish the current task here. If you haven't said so yet this session, tell the " +
+		"user in one line that new work is cheaper in a fresh session (after writing what it needs into the findings " +
+		"notes or a hand-over note). " +
 		'Detach side sessions you start (CLAUDE.md "Side sessions").'
 	);
 }
