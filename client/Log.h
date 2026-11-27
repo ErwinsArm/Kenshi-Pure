@@ -2,6 +2,8 @@
 // Built with the VC++ 2010 (v100) toolset; keep to C++ that compiler accepts.
 #pragma once
 
+#include <string>
+
 namespace kp
 {
     // Opens the log (the previous one is kept as KenshiPure.prev.log). Safe to call once.
@@ -11,6 +13,8 @@ namespace kp
     // Same, but gives up instead of waiting if another thread holds the log (for the
     // exception handler, which must never block).
     void LogTry(const char* fmt, ...);
+    // The last `lines` log lines (at most 500, each cut at ~250 characters), oldest first.
+    std::string LogTail(int lines);
     // Folder of the plugin DLL, with trailing backslash (wide).
     const wchar_t* PluginDir();
 }

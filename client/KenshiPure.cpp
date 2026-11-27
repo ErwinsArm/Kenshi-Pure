@@ -14,6 +14,7 @@
 #include <kenshi/Globals.h>
 
 #include "Log.h"
+#include "Probe.h"
 
 #define KP_VERSION "0.0.1-m0"
 
@@ -111,6 +112,7 @@ namespace
             kp::Log("build: unknown build - staying inactive");
             return false;
         }
+        kp::ProbeSetBuild(known ? known : "not a build we measured", version.c_str());
         kp::Log("build: %s build - active", known ? "known" : "KenshiLib-supported (hash not measured by us)");
         return true;
     }
@@ -237,6 +239,7 @@ namespace
             g_lastLine = now;
             AbiProof(gw);
         }
+        if (g_abi != ABI_FAIL) kp::ProbeOnFrame(gw, g_frames, g_frameThread);
     }
 
     bool AnarchyLoaded()
@@ -285,4 +288,5 @@ __declspec(dllexport) void startPlugin()
         return;
     }
     kp::Log("frame: hook installed; waiting for the first frame");
+    kp::ProbeStart();
 }

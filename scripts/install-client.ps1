@@ -6,7 +6,9 @@
 #     powershell -ExecutionPolicy Bypass -File scripts\install-client.ps1 -GameDir "<Kenshi folder>" -Uninstall
 #
 # What it touches, and nothing else:
-#   <game>\mods\KenshiPure\        our plugin folder (KenshiPure.dll, KenshiPure.mod, RE_Kenshi.json)
+#   <game>\mods\KenshiPure\        our plugin folder (KenshiPure.dll, KenshiPure.mod, RE_Kenshi.json, and
+#                                  KenshiPure.cfg: with -ProbeWrite it holds probe_write=1, which lets the
+#                                  live game probe heal, teleport and spawn items; without it, no cfg)
 #   <game>\data\mods.cfg           adds / removes the line "KenshiPure.mod" (the game's mod list)
 #   <game>\Plugins_x64.cfg         removes / restores AnarchyKenshi's line
 #                                  "Plugin=mods/AnarchyKenshi/AnarchyLoader"; all other lines and their
@@ -16,6 +18,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$GameDir,
     [switch]$Uninstall,
+    [switch]$ProbeWrite,  # allow the probe's write commands (heal, teleport, spawn_item)
     [string]$DllPath = "",
     [switch]$NoGameCheck  # for tests only: skip the "Kenshi is running" check
 )
@@ -70,6 +73,9 @@ if (-not $Uninstall) {
     if (Test-Path -LiteralPath $pdb) { Copy-Item -LiteralPath $pdb -Destination (Join-Path $modDir "KenshiPure.pdb") -Force }
     Copy-Item -LiteralPath (Join-Path $RepoRoot "client\mod\RE_Kenshi.json") -Destination (Join-Path $modDir "RE_Kenshi.json") -Force
     [IO.File]::WriteAllBytes((Join-Path $modDir "KenshiPure.mod"), $EmptyMod)
+    $cfg = Join-Path $modDir "KenshiPure.cfg"
+    if ($ProbeWrite) { Set-Content -LiteralPath $cfg -Value "probe_write=1" -Encoding ASCII }
+    elseif (Test-Path -LiteralPath $cfg) { Remove-Item -LiteralPath $cfg -Force }
 
     $mods = Read-CfgFile $modsCfg
     if ((Find-CfgLine $mods.Lines $ModLine) -lt 0) {
@@ -88,6 +94,7 @@ if (-not $Uninstall) {
 
     Write-Host "KenshiPure installed in $modDir"
     Write-Host ("AnarchyKenshi: " + $(if ($state.removedAnarchyLine) { "switched off (uninstall switches it back on)" } else { "was not on" }))
+    Write-Host ("Live probe write commands: " + $(if ($ProbeWrite) { "ON (heal, teleport, spawn_item)" } else { "off" }))
     Write-Host "Log after a game start: $(Join-Path $modDir 'KenshiPure.log')"
 }
 else {
@@ -114,7 +121,7 @@ else {
     }
 
     # Remove our files; keep the logs so a failed run can still be read.
-    foreach ($f in @("KenshiPure.dll", "KenshiPure.pdb", "KenshiPure.mod", "RE_Kenshi.json", "install-state.json")) {
+    foreach ($f in @("KenshiPure.dll", "KenshiPure.pdb", "KenshiPure.mod", "RE_Kenshi.json", "KenshiPure.cfg", "install-state.json")) {
         $p = Join-Path $modDir $f
         if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
     }

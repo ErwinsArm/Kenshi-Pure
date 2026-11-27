@@ -106,7 +106,12 @@ if ($have -ne $ReaVersion) {
 $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
 $heap  = if ($env:GHIDRA_HEADLESS_MAXMEM) { $env:GHIDRA_HEADLESS_MAXMEM } else { "$([math]::Max(2, [math]::Min(8, [math]::Floor($ramGB / 2))))G" }
 
-$config = [ordered]@{ mcpServers = [ordered]@{ rea = [ordered]@{
+$servers = [ordered]@{}   # keep other servers (e.g. kenshi-probe from setup-probe-mcp.ps1)
+if (Test-Path $McpJson) {
+  $old = Get-Content -Raw $McpJson | ConvertFrom-Json
+  if ($old.mcpServers) { foreach ($p in $old.mcpServers.PSObject.Properties) { $servers[$p.Name] = $p.Value } }
+}
+$servers['rea'] = [ordered]@{
   command = $node
   args    = @($rea, 'mcp')
   env     = [ordered]@{
@@ -114,7 +119,8 @@ $config = [ordered]@{ mcpServers = [ordered]@{ rea = [ordered]@{
     JAVA_HOME          = (Join-Path $Root 'jdk')
     GHIDRA_HEADLESS_MAXMEM = $heap
   }
-} } }
+}
+$config = [ordered]@{ mcpServers = $servers }
 $json = $config | ConvertTo-Json -Depth 6
 [IO.File]::WriteAllText($McpJson, $json + "`n", (New-Object Text.UTF8Encoding $false))
 "Wrote $McpJson"

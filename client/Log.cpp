@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <wchar.h>
 #include <share.h>
+#include <string>
 
 namespace
 {
@@ -25,15 +26,24 @@ namespace
         if (slash) slash[1] = 0;
     }
 
+    // Last lines kept in memory for the probe's log_tail command (guarded by g_lock).
+    const int kRing = 500;
+    char g_ring[kRing][256];
+    unsigned long long g_ringCount = 0;
+
     void WriteLine(const char* fmt, va_list args)
     {
-        if (!g_file) return;
         SYSTEMTIME t;
         GetLocalTime(&t);
         double up = (GetTickCount64() - g_start) / 1000.0;
-        fprintf(g_file, "%02u:%02u:%02u.%03u +%9.3f [%5lu] ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds,
-                up, GetCurrentThreadId());
-        vfprintf(g_file, fmt, args);
+        char line[256];
+        int n = _snprintf_s(line, sizeof(line), _TRUNCATE, "%02u:%02u:%02u.%03u +%9.3f [%5lu] ", t.wHour, t.wMinute,
+                            t.wSecond, t.wMilliseconds, up, GetCurrentThreadId());
+        if (n > 0) _vsnprintf_s(line + n, sizeof(line) - n, _TRUNCATE, fmt, args);
+        _snprintf_s(g_ring[g_ringCount % kRing], sizeof(g_ring[0]), _TRUNCATE, "%s", line);
+        ++g_ringCount;
+        if (!g_file) return;
+        fputs(line, g_file);
         fputc('\n', g_file);
         fflush(g_file);
     }
@@ -74,6 +84,22 @@ namespace kp
         WriteLine(fmt, args);
         va_end(args);
         LeaveCriticalSection(&g_lock);
+    }
+
+    std::string LogTail(int lines)
+    {
+        std::string out;
+        if (!g_ready) return out;
+        EnterCriticalSection(&g_lock);
+        unsigned long long have = g_ringCount < kRing ? g_ringCount : kRing;
+        unsigned long long take = (unsigned long long)lines < have ? lines : have;
+        for (unsigned long long i = g_ringCount - take; i < g_ringCount; ++i)
+        {
+            out += g_ring[i % kRing];
+            out += '\n';
+        }
+        LeaveCriticalSection(&g_lock);
+        return out;
     }
 
     const wchar_t* PluginDir() { return g_dir; }

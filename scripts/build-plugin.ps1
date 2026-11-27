@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0) { throw "compile failed ($LASTEXITCODE)" }
 
 $objs = Get-ChildItem -LiteralPath $obj -Filter *.obj | ForEach-Object { $_.FullName }
 $linkArgs = @("/nologo", "/DLL", "/OUT:$dll", "/MANIFEST:NO", "/DEBUG", "/OPT:REF", "/OPT:ICF",
-              "/PDB:$(Join-Path $out 'KenshiPure.pdb')") + $objs + @("KenshiLib.lib", "bcrypt.lib", "user32.lib")
+              "/PDB:$(Join-Path $out 'KenshiPure.pdb')") + $objs + @("KenshiLib.lib", "bcrypt.lib", "user32.lib", "ws2_32.lib")
 & (Join-Path $Tc.Vc64 "bin\amd64\link.exe") @linkArgs
 if ($LASTEXITCODE -ne 0) { Stop-ToolchainHelpers; throw "link failed ($LASTEXITCODE)" }
 
