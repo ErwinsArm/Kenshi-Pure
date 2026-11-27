@@ -193,6 +193,59 @@ id; stop leaves on purpose (server logs "left") in a few ms.
 windows, logs in `build\net\kp-server.log`, `kp-bot.log`), then play; `KenshiPure.log` shows
 `net: welcomed` and `net: remote bot …`, the server log `pose: player … (player)`.
 
+# Client: stand-in body (M4)
+
+Status: built, tested without the game (`kp-drive-test`, 79 checks), one in-game run (**M**, the user's run on
+1.0.65 with RE_Kenshi, build 0.0.5-m4, `kp-bot --around-first --radius 300 --speed 60`, one cycle and a part
+of a second, then a save load and another cycle). Coordinates and the lifecycle work; walking is too slow.
+
+**Choice**: the stand-in is the nearest loaded NPC within 600 units of the local character that is not the
+player's (`isPlayerCharacter` false, not in `PlayerInterface::playerCharacters`), alive, conscious, with
+movement and AI (`client/StandIn.cpp`). Not a spawned body: spawning is M5's risk (G3), M4 isolates the
+driving. Side effects on that NPC: it is moved, its own AI is skipped, `Character::setDestination` clears its
+job list; on release it is halted and teleported back to where it stood. Do not save during a test.
+
+**Pieces**
+- `client/Drive.{h,cpp}` (pure, both toolchains): `RemoteTrack` (pose time = receive time − age; repeats
+  ignored; interpolation 150 ms behind; extrapolation ≤ 300 ms) and `DrivePlanner` (place every 100 ms; snap
+  when the x/z gap > `standin_snap` (300), at most once a second; walk to a lead point 0.6 s ahead, re-issued when
+  it moved > 15 units or after 1 s, speed × (1 + gap/100) capped at 2.5; steer = velocity + 2/s × gap, capped).
+- `NetFrame` owns the lifecycle: the first remote player with a pose drives it; pick every 2 s; release on
+  no own character or a new *world* epoch (menu, load, load stall; not a click on another own character) without
+  any call into the old world; release with put-back on a remote pose older than 3 s, the player leaving, or 3
+  failed commands in a row. Every read re-resolves the stored `hand` and refuses a body that is a player
+  character or has another name.
+- `client/StandIn.cpp`: every call in `__try` on the frame thread, through the 12 rows of feature
+  `optional:standin-write` (`client/sites.tsv`; each 1.0.68 value equals AK's RVA in remote-bodies.md).
+  AI skip: a MinHook detour on `AI::periodicUpdate` (or `Character::periodicUpdate`, `standin_ai=character`)
+  that returns early for one pointer.
+- Cycle (`standin=cycle`): place 20 s (AI skipped) → path 45 s (`CharMovement::setDestination`, AI skipped)
+  → order 45 s (`Character::setDestination`, AI on: its TASK_MOVE job is ticked by the AI) → steer 45 s
+  (`setDirectMovement`, AI skipped); a summary line per phase. Place/snap: `_setPositionDirectionAndTeleport`;
+  in steer mode AK's `_setPositionSimple` + `teleportVisuallyOnly`.
+- Config keys in `KenshiPure.cfg`: `standin` (off|place|path|order|steer|cycle, default off), `standin_ai`
+  (ai|character|none), `standin_snap`, `standin_range`, `standin_name`.
+
+**Run result (M)**
+
+| Phase | gap mean / max | body moving | snaps | what the user saw |
+|---|---|---|---|---|
+| place | 8.7 / 124 (10.1 in the second cycle) | 98 % | 0 | follows the circle in small teleport steps |
+| path (AI skipped) | 156 / 301 | 100 % | 6 | walks, too slowly; teleported forward every few seconds |
+| order (AI on) | 158 / 301 | 100 % | 7 | the same |
+| steer (AI skipped) | 159 / 301 | 20 % | 8 | runs faster, but also glitchy |
+
+- Walking speed stayed at 15.0 units/s in both walk phases although `setDesiredSpeed` asked for 60–150, so the
+  body fell behind the bot (60 units/s) and snapped. The float in `+0xBC` is not what limits an NPC's walk
+  (cause not known; candidates: the `MoveSpeed` order `setDesiredSpeedOrders`/`speedOrders`, or the NPC's own
+  walk speed, **I**).
+- `setDirectMovement` moved the body only 20 % of the time: candidate B as called here does not work (**M**).
+- Both walk calls alone moved the body, with the AI skipped (path) and with it on (order); which looks better
+  could not be told apart in this run.
+- The skipped AI ticks (1492) ran on another thread than the frame thread (**M**: thread id in the detour).
+- A save load released the stand-in without calls (`no own character`), 7 s later the same NPC was picked again
+  at its saved place; no fault, no exception line.
+
 # Client: live game probe
 
 Source: `client/Probe.cpp`, `client/Probe.h`; MCP side: `mcp/kenshi-probe.mjs`. Setup: `docs/setup.md`.

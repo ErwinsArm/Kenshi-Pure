@@ -153,9 +153,9 @@ every frame restarts the path and stutters); lead point ≈ 0.6 s ahead along th
 catch-up speed proportional to the gap, capped at 2.5×.
 
 Speed: `setDesiredSpeed(float)` only stores the float at `CharMovement+0xBC` (1.0.68 `0x3332f0`,
-**M** by the critic); KL names `+0xB8` `currentSpeed` and `+0xBC` `desiredSpeed`. The unit is
-not known; WoK saw about 5 units/s walking (**D**). M4 logs `+0xB8` of a walking local character
-to calibrate it.
+**M** by the critic); KL names `+0xB8` `currentSpeed` and `+0xBC` `desiredSpeed`. Unit: world units
+per game second (M1, [client.md](../client.md) "Own pose"; the player walks ~72). For an NPC the float does
+not set the walk speed: in the M4 run it walked at 15.0 with 60–150 asked (**M**); what limits it is open.
 
 No source ran the M4 chain (spawned body + AI skip + one of these drives) on 1.0.65. M4 tries two
 candidates on the same stand-in and keeps the one that looks right:
@@ -165,6 +165,12 @@ candidates on the same stand-in and keeps the one that looks right:
   a few metres.
 - **B (direct steer):** AK's shipped way: every frame `setDirectMovement(direction, limit)` and
   `setDesiredSpeed`, place with `_setPositionSimple` + `teleportVisuallyOnly` when off.
+
+First M4 run on 1.0.65 (an existing NPC, [client.md](../client.md) "Stand-in body (M4)", **M**): each half of
+A alone moves the body (`CharMovement::setDestination` with the AI skipped; `Character::setDestination`
+with the AI on), but only at 15 units/s; B as called (velocity vector, limit = per-step distance cap) moved
+it only 20 % of the time. Skipping `AI::periodicUpdate` ran without fault; the AI tick runs on another
+thread than the frame thread.
 
 ## Removal
 
