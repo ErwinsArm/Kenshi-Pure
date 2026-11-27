@@ -12,7 +12,7 @@ unattended in-game runs with `scripts/run-game-test.ps1` (Kenshi closed first; t
 COPY of the save "MP TEST"); notes (`docs/client.md` M5 section, plan, `docs/findings/remote-bodies.md`,
 roadmap, knowledge map, `WORK.md`); commit by path, pull, push.
 
-State: the M5 code is NOT committed yet (uncommitted files in this folder: see `git status`); only this file is.
+State: M5 code committed as work in progress (builds, all 5 net tests pass incl. the new kp-remote-test); not run in game yet.
 
 ## Done
 - Static facts (section "New static facts" below): AK steers with a UNIT direction (M4 passed the whole velocity:
@@ -33,13 +33,12 @@ State: the M5 code is NOT committed yet (uncommitted files in this folder: see `
 - Game adapter `client/RemoteGame.{h,cpp}` written, wired in `client/Net.cpp`; StandIn.cpp shares its AI-skip detour
   (array, `AiSkipSet`) and `DriveApplyTo`. `client/Game.h` includes CharStats.h. **Plugin builds** (build-plugin.ps1 ok).
 
+- Tests: `net/test/RemoteTest.cpp` (kp-remote-test, 63 checks: config, settle, spawn, drive with raised max speed, leave, stale, old pose, world change kept/forgotten with no call while no world, failed spawns, destroy that does not remove, death, KO, faulting commands, session end, range, body limit, steer AI skip, pause).
+
 ## Next steps (in order)
-1. Tests: `net/test/RemoteTest.cpp` (join, spawn, drive, leave, stale, reload forget, respawn, faults); add to
-   `net/CMakeLists.txt` (kp-core-test and kp-drive-test already list `../client/Remote.cpp`). Build: `scripts/build-net.ps1`,
-   `scripts/build-plugin.ps1`.
-2. Test tooling: `scripts/run-game-test.ps1` -BotSeconds / -BotRestart; autoload steps `at=<s> load|save <name>`.
-3. In-game runs (Kenshi closed first; G7 on a copy of "MP TEST", never on it).
-4. Notes: docs/client.md M5 section, plan, remote-bodies.md, roadmap DATA, knowledge map, WORK.md; commit, pull, push.
+1. Test tooling: `scripts/run-game-test.ps1` -BotSeconds / -BotRestart; autoload steps `at=<s> load|save <name>`.
+2. In-game runs (Kenshi closed first; G7 on a copy of "MP TEST", never on it).
+3. Notes: docs/client.md M5 section, plan, remote-bodies.md, roadmap DATA, knowledge map, WORK.md; commit, pull, push.
 
 ## Design and new static facts
 

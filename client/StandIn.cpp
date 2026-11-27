@@ -23,7 +23,9 @@ namespace
     // The AI skip: the detours compare one pointer-sized value (written only on the frame thread).
     // AK's own skip list is locked and double-buffered and it logs AI ticks that overrun, so the AI
     // tick may run on another thread (remote-bodies.md G4, inferred): read it once, never more.
-    void* volatile g_skipAi = NULL;     // AI* of the stand-in (standin_ai=ai)
+    // Entry 0: the stand-in's AI* (standin_ai=ai); entries 1..KP_SKIP_REMOTE: the M5 remote bodies (AiSkipSet).
+    void* volatile g_skipAi[1 + KP_SKIP_REMOTE];
+    bool g_aiHooked = false;
     void* volatile g_skipChar = NULL;   // Character* of the stand-in (standin_ai=character)
     int g_aiMode = kp::DA_NONE;
     bool g_skipOn = false;
@@ -39,7 +41,9 @@ namespace
     void (*g_aiOrig)(AI*, float) = NULL;
     void AiDetour(AI* self, float t)
     {
-        if (self != NULL && (void*)self == g_skipAi) { Skipped(); return; }
+        if (self != NULL)
+            for (int i = 0; i < 1 + KP_SKIP_REMOTE; ++i)
+                if ((void*)self == g_skipAi[i]) { Skipped(); return; }
         g_aiOrig(self, t);
     }
     void (*g_charOrig)(Character*) = NULL;
@@ -168,7 +172,7 @@ namespace
             __try { ai = KP_FIELD(c, Character, ai); }
             __except (EXCEPTION_EXECUTE_HANDLER) { ai = NULL; }
         }
-        g_skipAi = ai;
+        g_skipAi[0] = ai;
         g_skipChar = (c && g_skipOn && g_aiMode == kp::DA_CHARACTER) ? (void*)c : NULL;
     }
 
@@ -287,6 +291,23 @@ namespace
 
 namespace kp
 {
+    bool AiSkipInstall()
+    {
+        if (g_aiHooked) return true;
+        if (!SiteOk(KPS_AI__periodicUpdate)) return false;
+        g_aiHooked = HookSite(KPS_AI__periodicUpdate, (void*)&AiDetour, reinterpret_cast<void**>(&g_aiOrig));
+        return g_aiHooked;
+    }
+
+    void AiSkipSet(int index, void* ai)
+    {
+        if (index >= 1 && index <= KP_SKIP_REMOTE) g_skipAi[index] = ai;
+    }
+
+    long AiSkippedTicks() { return g_skipped; }
+
+    bool DriveApplyTo(Character* c, const DriveCmd& cmd, int mode) { return c && Apply(c, cmd, mode); }
+
     bool StandInInit(DriveConfig* cfg)
     {
         if (cfg->mode == DM_OFF)
@@ -317,7 +338,7 @@ namespace kp
         g_aiMode = cfg->aiSkip;
         bool hooked = true;
         if (g_aiMode == DA_AI)
-            hooked = HookSite(KPS_AI__periodicUpdate, (void*)&AiDetour, reinterpret_cast<void**>(&g_aiOrig));
+            hooked = AiSkipInstall();
         else if (g_aiMode == DA_CHARACTER)
             hooked = HookSite(KPS_Character__periodicUpdate, (void*)&CharDetour, reinterpret_cast<void**>(&g_charOrig));
         if (!hooked)
@@ -383,7 +404,7 @@ namespace kp
         Character* c = Resolve();
         if (!c || !ReadBody(c, out))
         {
-            g_skipAi = NULL;
+            g_skipAi[0] = NULL;
             g_skipChar = NULL;
             return false;
         }
@@ -406,7 +427,7 @@ namespace kp
     void StandInDrop(bool worldGone)
     {
         g_skipOn = false;
-        g_skipAi = NULL;
+        g_skipAi[0] = NULL;
         g_skipChar = NULL;
         if (!worldGone)
         {

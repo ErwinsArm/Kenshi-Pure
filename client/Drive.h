@@ -69,8 +69,8 @@ namespace kp
         float pos[3];      // PLACE / SNAP: where; WALK: destination
         float yaw;         // PLACE / SNAP
         float speed;       // WALK / STEER: wanted speed (units per game second)
-        float vel[3];      // STEER: wanted velocity (x/z, y = 0)
-        float limit;       // STEER: speed limit
+        float vel[3];      // STEER: unit direction (x/z, y = 0): the game scales it by the speed (1.0.65 0x147c60, M)
+        float limit;       // STEER: setDirectMovement's float; the game keeps sqrt of it as the most one step may move
     };
 
     struct BodyState
@@ -84,6 +84,7 @@ namespace kp
         float maxSpeed;    // maxSpeed (+0xB4)
         float walkSpeed;   // walkSpeed (+0xC0): what MoveSpeed WALK sets desired to (0x6646e6, M)
         int speedOrders;   // MoveSpeed: 0 walk, 1 jog (desired 55), 2 run / 3 grouped (999), 4 no change
+        int down;          // dead or unconscious (M5 bodies; the stand-in leaves it 0)
     };
 
     struct DriveStats

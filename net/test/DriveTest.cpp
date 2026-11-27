@@ -308,13 +308,17 @@ namespace
         CHECK(p.Step(4100, Body(0, 0), Target(400, 0, 50, 0, true), &gap).kind == DC_SNAP);
         CHECK(p.Stats().snaps == 2);
 
-        // Steer: velocity plus correction, capped; halt once when stopped on target.
+        // Steer (AK's values): unit direction, speed = |velocity + correction| capped at 1.5 x the sender's speed,
+        // limit = speed^2; halt once when stopped on target.
         p.Reset(DM_STEER, 300.0f);
         p.Step(0, Body(0, 0), Target(0, 0, 0, 0, false), &gap);
-        c = p.Step(20, Body(0, 0), Target(10, 0, 30, 0, true), &gap);
-        CHECK(c.kind == DC_STEER && std::fabs(c.vel[0] - 50.0f) < 1e-3f && c.vel[1] == 0.0f);
-        c = p.Step(40, Body(0, 0), Target(200, 0, 30, 0, true), &gap);
-        CHECK(c.kind == DC_STEER && std::fabs(c.speed - 75.0f) < 1e-3f && c.limit == c.speed * 0.25f);
+        c = p.Step(20, Body(0, 0), Target(10, 0, 30, 0, true), &gap);   // 30 + 2 x 10 = 50, capped at 45
+        CHECK(c.kind == DC_STEER && std::fabs(c.vel[0] - 1.0f) < 1e-5f && c.vel[1] == 0.0f && c.vel[2] == 0.0f);
+        CHECK(std::fabs(c.speed - 45.0f) < 1e-3f && std::fabs(c.limit - 45.0f * 45.0f) < 1e-2f);
+        c = p.Step(30, Body(0, 0), Target(5, 0, 40, 0, true), &gap);    // 40 + 10 = 50 < 60: uncapped
+        CHECK(c.kind == DC_STEER && std::fabs(c.speed - 50.0f) < 1e-3f);
+        c = p.Step(40, Body(0, 0), Target(0, 100, 0, 0, false), &gap);  // standing sender: cap 200
+        CHECK(c.kind == DC_STEER && std::fabs(c.vel[2] - 1.0f) < 1e-5f && std::fabs(c.speed - 200.0f) < 1e-3f);
         CHECK(p.Step(60, Body(10, 0), Target(12, 0, 0, 0, false), &gap).kind == DC_HALT);
         CHECK(p.Step(80, Body(12, 0), Target(12, 0, 0, 0, false), &gap).kind == DC_NONE);
     }

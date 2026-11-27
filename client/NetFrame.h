@@ -7,6 +7,7 @@
 
 #include "KpCore.h"
 #include "Drive.h"
+#include "Remote.h"
 
 namespace kp
 {
@@ -49,10 +50,22 @@ namespace kp
         virtual bool StandInApply(const DriveCmd& /*cmd*/, int /*mode*/) { return false; }
         virtual void StandInSkipAi(bool /*on*/) {}
         virtual void StandInRelease(bool /*worldGone*/) {}
-        // M5 (remote bodies): not used yet.
-        virtual void SpawnRemote(unsigned short /*playerId*/, const KpPose& /*pose*/) {}
-        virtual void MoveRemote(unsigned short /*playerId*/, const KpPose& /*pose*/) {}
-        virtual void RemoveRemote(unsigned short /*playerId*/) {}
+        // M5 remote bodies (RemoteGame.cpp): the adapter keeps one hand per slot, never a pointer. Spawn builds a
+        // body (own squad, cfg faction, read back) at pos facing yaw; Update re-resolves it, keeps its max speed
+        // (0 = its own) and reads it (false: gone or someone else); Apply carries one command out; Destroy asks
+        // GameWorld::destroy once (false: faulted or already gone); Exists polls the hand after that; Free and
+        // ForgetAll drop hands without any game call.
+        virtual bool RemoteSpawn(const RemoteConfig& /*cfg*/, const char* /*playerName*/, const float* /*pos*/, float /*yaw*/,
+                                 RemoteSpawnInfo* /*out*/) { return false; }
+        virtual bool RemoteUpdate(int /*slot*/, float /*maxSpeed*/, BodyState* /*out*/) { return false; }
+        virtual bool RemoteApply(int /*slot*/, const DriveCmd& /*cmd*/, int /*mode*/) { return false; }
+        virtual void RemoteSkipAi(int /*slot*/, bool /*on*/) {}
+        virtual bool RemoteDestroy(int /*slot*/, const char* /*reason*/) { return false; }
+        virtual bool RemoteExists(int /*slot*/) { return false; }
+        // After a world change: true if the slot's hand still resolves to the body spawned there (no write).
+        virtual bool RemoteVerify(int /*slot*/) { return false; }
+        virtual void RemoteFree(int /*slot*/) {}
+        virtual void RemoteForgetAll() {}
     };
 
     // Reads host, port and name from a KenshiPure.cfg text (key=value lines, '#' comments).
@@ -80,6 +93,9 @@ namespace kp
         NetFrame();
         // Stand-in driving (M4); off unless cfg.mode says otherwise. Call before Start.
         void SetDrive(const DriveConfig& cfg) { drive_ = cfg; }
+        // Remote bodies (M5); off while the stand-in is on (the two never run together). Call before Start.
+        void SetRemote(const RemoteConfig& cfg) { remote_.Configure(cfg); }
+        const RemoteBodies& Bodies() const { return remote_; }
         bool StandInDriving() const { return siOn_; }
         // Current cycle phase (0-based; fixed modes stay in 0), its planner mode and AI skip.
         int StandInPhase() const { return phase_; }
@@ -154,5 +170,7 @@ namespace kp
         float lastGap_;
         BodyState lastBody_;
         DriveCmd lastCmd_;
+
+        RemoteBodies remote_;
     };
 }

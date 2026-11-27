@@ -7,6 +7,7 @@
 #include "NetFrame.h"
 #include "Pose.h"
 #include "StandIn.h"
+#include "RemoteGame.h"
 #include "Log.h"
 
 #include <windows.h>
@@ -40,6 +41,18 @@ namespace
         bool StandInApply(const kp::DriveCmd& cmd, int mode) { return kp::StandInApplyCmd(cmd, mode); }
         void StandInSkipAi(bool on) { kp::StandInSetSkip(on); }
         void StandInRelease(bool worldGone) { kp::StandInDrop(worldGone); }
+        bool RemoteSpawn(const kp::RemoteConfig& cfg, const char* name, const float* pos, float yaw, kp::RemoteSpawnInfo* out)
+        {
+            return kp::RemoteGameSpawn(cfg, name, pos, yaw, out);
+        }
+        bool RemoteUpdate(int slot, float maxSpeed, kp::BodyState* out) { return kp::RemoteGameUpdate(slot, maxSpeed, out); }
+        bool RemoteApply(int slot, const kp::DriveCmd& cmd, int mode) { return kp::RemoteGameApply(slot, cmd, mode); }
+        void RemoteSkipAi(int slot, bool on) { kp::RemoteGameSkipAi(slot, on); }
+        bool RemoteDestroy(int slot, const char* reason) { return kp::RemoteGameDestroy(slot, reason); }
+        bool RemoteExists(int slot) { return kp::RemoteGameExists(slot); }
+        bool RemoteVerify(int slot) { return kp::RemoteGameVerify(slot); }
+        void RemoteFree(int slot) { kp::RemoteGameFree(slot); }
+        void RemoteForgetAll() { kp::RemoteGameForgetAll(); }
     };
 
     GameAccess g_game;
@@ -96,6 +109,11 @@ namespace kp
         kp::DriveParseConfig(text, &drive);
         kp::StandInInit(&drive);   // logs; off (mode DM_OFF) when a row or the detour is missing
         g_net.SetDrive(drive);
+        kp::RemoteConfig remote;
+        kp::RemoteParseConfig(text, &remote);
+        if (drive.mode != kp::DM_OFF) remote.on = 0;   // the M4 stand-in and the remote bodies never run together
+        if (!kp::RemoteGameInit(remote)) remote.on = 0;   // logs why
+        g_net.SetRemote(remote);
         if (!g_net.Start(api, cfg, &g_game)) return;   // the core logged why
         g_on = true;
     }

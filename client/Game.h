@@ -31,6 +31,7 @@
 #include <kenshi/RootObjectFactory.h>
 #include <kenshi/SaveManager.h>
 #include <kenshi/util/hand.h>
+#include <kenshi/CharStats.h>    // CharStats::moveSpeed row (M5)
 
 #include "Sites.h"
 #include "kp_fields_gen.h"

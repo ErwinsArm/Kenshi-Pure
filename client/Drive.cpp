@@ -287,8 +287,15 @@ namespace kp
             return c;
         }
 
-        // DM_STEER (AK's way): a velocity every frame, corrected toward the target.
-        if (!remoteMoving && gap < 5.0f)
+        // DM_STEER (AK's way, values from AK 0x50bd0a..0x50c699, M): wanted velocity = the sender's velocity plus a
+        // correction toward the target; its length capped at min(1.5 x the sender's speed, 200) (200 when the sender
+        // stands). The game multiplies the direction by the speed (HavokCharacter::updateVelocity, 1.0.65 0x147c60, M),
+        // so the command carries a unit direction and the length as the speed; M4 sent the whole velocity.
+        float v[3] = { target.vel[0] + (target.pos[0] - body.pos[0]) * 2.0f, 0.0f,
+                       target.vel[2] + (target.pos[2] - body.pos[2]) * 2.0f };
+        if (!remoteMoving) { v[0] = (target.pos[0] - body.pos[0]) * 2.0f; v[2] = (target.pos[2] - body.pos[2]) * 2.0f; }
+        float len = LenXZ(v);
+        if ((!remoteMoving && gap < 5.0f) || len < 0.01f)
         {
             if (!halted_)
             {
@@ -298,21 +305,17 @@ namespace kp
             return c;
         }
         halted_ = false;
-        float v[3] = { target.vel[0] + (target.pos[0] - body.pos[0]) * 2.0f, 0.0f,
-                       target.vel[2] + (target.pos[2] - body.pos[2]) * 2.0f };
-        if (!remoteMoving) { v[0] = (target.pos[0] - body.pos[0]) * 2.0f; v[2] = (target.pos[2] - body.pos[2]) * 2.0f; }
-        float cap = 2.5f * (remoteSpeed > 20.0f ? remoteSpeed : 20.0f);
-        float len = LenXZ(v);
-        if (len > cap && len > 0.0f)
-        {
-            v[0] *= cap / len;
-            v[2] *= cap / len;
-            len = cap;
-        }
+        float cap = remoteSpeed > 0.1f ? 1.5f * remoteSpeed : 200.0f;
+        if (cap > 200.0f) cap = 200.0f;
+        if (cap < 20.0f) cap = 20.0f;   // a slow sender must still let the body close a gap
+        float speed = len > cap ? cap : len;
         c.kind = DC_STEER;
-        for (int i = 0; i < 3; ++i) c.vel[i] = v[i];
-        c.speed = len;
-        c.limit = len * 0.25f;   // setDirectMovement caps the distance of one step (frame time x speed) at this (M)
+        c.vel[0] = v[0] / len;
+        c.vel[2] = v[2] / len;
+        c.speed = speed;
+        // The game keeps sqrt(limit) as the most one step may move (CharMovement::setDirectMovement 1.0.65 0x3332c0,
+        // update 0x65f6b3, M); speed^2 makes that one second of motion, so it never cuts a frame's step.
+        c.limit = speed * speed;
         return c;
     }
 }

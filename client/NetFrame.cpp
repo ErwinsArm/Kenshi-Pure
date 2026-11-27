@@ -114,6 +114,14 @@ namespace kp
         api_ = api;
         game_ = game;
         if (!api_ || !game_) return false;
+        if (drive_.mode != DM_OFF && remote_.Config().on)
+        {
+            RemoteConfig rc = remote_.Config();
+            rc.on = 0;
+            remote_.Configure(rc);
+            Logf("remote: off (the M4 stand-in is on; the two never run together)");
+        }
+        remote_.SetGame(game_);
         core_ = api_->start(&cfg);
         if (!core_) return false;
         return true;
@@ -123,6 +131,7 @@ namespace kp
     {
         // Game exit (or a restart): forget the stand-in without calling into a world that may be going away.
         if (siOn_) Release(0, true, "networking stops");
+        remote_.Stop();
         track_.Clear();
         trackId_ = 0;
         KpCore* c = core_;
@@ -231,10 +240,12 @@ namespace kp
                 case KP_EV_WELCOME:
                     memset(players_, 0, sizeof(players_));   // a new session: nobody is known yet
                     ForgetTrack(0);
+                    remote_.OnSessionEnd("a new session");
                     break;
                 case KP_EV_JOINED:
                     Add((unsigned short)e.a, e.name);
                     Logf("net: player %u joined: %s", e.a, e.name);
+                    remote_.OnJoined((unsigned short)e.a, e.name);
                     break;
                 case KP_EV_LEFT:
                 {
@@ -242,12 +253,14 @@ namespace kp
                     Logf("net: player %u (%s) left (%s)", e.a, p ? p->name : "?", LeaveText(e.b));
                     if (p) memset(p, 0, sizeof(*p));
                     ForgetTrack((unsigned short)e.a);
+                    remote_.OnLeft((unsigned short)e.a, LeaveText(e.b));
                     break;
                 }
                 case KP_EV_LOST:
                 case KP_EV_CONNECT_FAILED:
                     memset(players_, 0, sizeof(players_));   // the core logs why
                     ForgetTrack(0);
+                    remote_.OnSessionEnd("connection lost");
                     break;
                 default:
                     break;
@@ -267,6 +280,7 @@ namespace kp
                 if (!p) continue;
                 p->last = rp[i];
                 p->havePose = true;
+                remote_.OnPose(nowMs, rp[i], p->name);
                 if (drive_.mode != DM_OFF)
                 {
                     if (trackId_ == 0) trackId_ = rp[i].playerId;   // the first remote player drives the stand-in
@@ -290,8 +304,10 @@ namespace kp
     {
         if (!core_) return;
         SendLocal(nowMs);
+        remote_.World(nowMs, localOk_, localEpoch_, localPos_, localPaused_);   // before the events: a load forgets first
         Drain(nowMs);
         DriveFrame(nowMs);
+        remote_.Frame(nowMs);
     }
 
     // ------------------------------------------------------------------ stand-in (M4)
