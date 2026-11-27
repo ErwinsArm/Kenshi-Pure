@@ -1,8 +1,3 @@
-// Faction.h pulls in Boost.Thread headers, which would auto-link a Boost library we do not build.
-// We use no Boost.Thread code, only header-only parts (unordered_set), so switch auto-linking off.
-#define BOOST_ALL_NO_LIB
-#define BOOST_SYSTEM_NO_DEPRECATED   // drops Boost.System's static error categories (need its .lib)
-
 #include "Probe.h"
 #include "Log.h"
 
@@ -18,20 +13,7 @@
 #include <math.h>
 #include <string>
 
-#include <core/Functions.h>
-#include <kenshi/GameWorld.h>
-#include <kenshi/Globals.h>
-#include <kenshi/PlayerInterface.h>
-#include <kenshi/Character.h>
-#include <kenshi/CharMovement.h>
-#include <kenshi/Faction.h>
-#include <kenshi/MedicalSystem.h>
-#include <kenshi/Inventory.h>
-#include <kenshi/Item.h>
-#include <kenshi/GameData.h>
-#include <kenshi/GameDataManager.h>
-#include <kenshi/RootObjectFactory.h>
-#include <kenshi/util/hand.h>
+#include "Game.h"   // KenshiLib declarations + our address layer (KP_FIELD)
 
 #define KP_PROBE_DEFAULT_PORT 47800
 #define KP_PROBE_WAIT_MS 3000     // how long a request waits for a frame
@@ -195,15 +177,15 @@ namespace
     {
         __try
         {
-            s->sameWorld = (ou == gw) ? 1 : 0;
+            s->sameWorld = (kp::GameWorldGlobal() == gw) ? 1 : 0;
             s->speed = gw->getFrameSpeedMultiplier();
             s->paused = gw->isPaused() ? 1 : 0;
             s->stamp = gw->getTimeStamp();
             s->hours = gw->getTimeFromStamp_inGameHours(s->stamp);
             CopyCamera(gw, s->cam);
-            PlayerInterface* pi = gw->player;
+            PlayerInterface* pi = KP_FIELD(gw, GameWorld, player);
             s->hasPlayer = pi ? 1 : 0;
-            s->players = pi ? pi->playerCharacters.count : 0;
+            s->players = pi ? KP_FIELD(pi, PlayerInterface, playerCharacters).count : 0;
             return true;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
@@ -216,8 +198,8 @@ namespace
     {
         __try
         {
-            PlayerInterface* pi = gw->player;
-            return pi ? pi->selectedCharacter.getCharacter() : NULL;
+            PlayerInterface* pi = KP_FIELD(gw, GameWorld, player);
+            return pi ? KP_FIELD(pi, PlayerInterface, selectedCharacter).getCharacter() : NULL;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
@@ -251,10 +233,10 @@ namespace
             MedicalSystem* m = c->getMedical();
             s->hasMedical = m ? 1 : 0;
             s->unconscious = (m && m->isUnconcious()) ? 1 : 0;
-            s->blood = m ? m->blood : 0.0f;
+            s->blood = m ? KP_FIELD(m, MedicalSystem, blood) : 0.0f;
             s->maxBlood = m ? m->getMaxBlood() : 0.0f;
-            s->hunger = m ? m->hunger : 0.0f;
-            s->knockoutTimer = m ? m->knockoutTimer : 0.0f;
+            s->hunger = m ? KP_FIELD(m, MedicalSystem, hunger) : 0.0f;
+            s->knockoutTimer = m ? KP_FIELD(m, MedicalSystem, knockoutTimer) : 0.0f;
             return true;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
@@ -283,11 +265,13 @@ namespace
         __try
         {
             *n = 0;
-            PlayerInterface* pi = gw->player;
-            if (!pi || !pi->playerCharacters.stuff) return true;
-            unsigned int count = pi->playerCharacters.count;
+            PlayerInterface* pi = KP_FIELD(gw, GameWorld, player);
+            if (!pi) return true;
+            lektor<Character*>& chars = KP_FIELD(pi, PlayerInterface, playerCharacters);
+            if (!chars.stuff) return true;
+            unsigned int count = chars.count;
             if (count > KP_PROBE_MAX_CHARS) count = KP_PROBE_MAX_CHARS;
-            for (unsigned int i = 0; i < count; ++i) list[i] = pi->playerCharacters.stuff[i];
+            for (unsigned int i = 0; i < count; ++i) list[i] = chars.stuff[i];
             *n = count;
             return true;
         }
@@ -473,7 +457,7 @@ namespace
     __declspec(noinline) void CopyDataName(GameData* d, char* out, size_t outSize)
     {
         out[0] = 0;
-        if (d) CopyStr(d->name, out, outSize);
+        if (d) CopyStr(KP_FIELD(d, GameData, name), out, outSize);
     }
 
     bool SampleParts(Character* c, PartSample* parts, int max, int* n)
@@ -489,15 +473,15 @@ namespace
                 MedicalSystem::HealthPartStatus* p = m->getPart((unsigned __int64)i);
                 if (!p) continue;
                 PartSample& s = parts[(*n)++];
-                CopyDataName(p->data, s.name, sizeof(s.name));
-                s.type = (int)p->whatAmI;
-                s.side = (int)p->side;
-                s.robotic = p->robotLimb ? 1 : 0;
-                s.flesh = p->flesh;
-                s.stun = p->fleshStun;
-                s.maxHealth = p->_maxHealth;
-                s.hpMult = p->HPMult;
-                s.percent = p->derivedFleshHealthPercent;
+                CopyDataName(KP_FIELD(p, MedicalSystem::HealthPartStatus, data), s.name, sizeof(s.name));
+                s.type = (int)KP_FIELD(p, MedicalSystem::HealthPartStatus, whatAmI);
+                s.side = (int)KP_FIELD(p, MedicalSystem::HealthPartStatus, side);
+                s.robotic = KP_FIELD(p, MedicalSystem::HealthPartStatus, robotLimb) ? 1 : 0;
+                s.flesh = KP_FIELD(p, MedicalSystem::HealthPartStatus, flesh);
+                s.stun = KP_FIELD(p, MedicalSystem::HealthPartStatus, fleshStun);
+                s.maxHealth = KP_FIELD(p, MedicalSystem::HealthPartStatus, _maxHealth);
+                s.hpMult = KP_FIELD(p, MedicalSystem::HealthPartStatus, HPMult);
+                s.percent = KP_FIELD(p, MedicalSystem::HealthPartStatus, derivedFleshHealthPercent);
             }
             return true;
         }
@@ -556,7 +540,7 @@ namespace
 
     __declspec(noinline) void CopySectionName(InventorySection* s, char* out, size_t outSize)
     {
-        CopyStr(s->name, out, outSize);
+        CopyStr(KP_FIELD(s, InventorySection, name), out, outSize);
     }
 
     bool SampleInventory(Character* c, ItemSample* out, int max, int* n)
@@ -573,15 +557,16 @@ namespace
                 if (!sec) continue;
                 char secName[48];
                 CopySectionName(sec, secName, sizeof(secName));
-                size_t cnt = sec->items.size();
+                Ogre::vector<InventorySection::SectionItem>::type& items = KP_FIELD(sec, InventorySection, items);
+                size_t cnt = items.size();
                 for (size_t i = 0; i < cnt && *n < max; ++i)
                 {
-                    Item* it = sec->items[i].item;
+                    Item* it = KP_FIELD(&items[i], InventorySection::SectionItem, item);
                     if (!it) continue;
                     ItemSample& o = out[(*n)++];
                     memcpy(o.section, secName, sizeof(secName));
                     CopyName(it, o.name, sizeof(o.name));
-                    o.quantity = it->quantity;
+                    o.quantity = KP_FIELD(it, InventoryItemBase, quantity);
                 }
             }
             return true;
@@ -649,7 +634,7 @@ namespace
     __declspec(noinline) void CollectDataInner(GameWorld* gw, int type, unsigned int* n, unsigned int* total)
     {
         lektor<GameData*> l;   // its array stays allocated (Kenshi's allocator): a small leak per query
-        gw->gamedata.getDataOfType(l, (itemType)type);
+        KP_FIELD(gw, GameWorld, gamedata).getDataOfType(l, (itemType)type);
         *total = l.count;
         *n = 0;
         for (unsigned int i = 0; i < l.count && *n < sizeof(g_data) / sizeof(g_data[0]); ++i) g_data[(*n)++] = l.stuff[i];
@@ -676,8 +661,8 @@ namespace
         {
             name[0] = 0;
             sid[0] = 0;
-            CopyStr(d->name, name, nameSize);
-            CopyStr(d->stringID, sid, sidSize);
+            CopyStr(KP_FIELD(d, GameData, name), name, nameSize);
+            CopyStr(KP_FIELD(d, GameData, stringID), sid, sidSize);
             return true;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
@@ -732,16 +717,17 @@ namespace
             {
                 MedicalSystem::HealthPartStatus* p = m->getPart((unsigned __int64)i);
                 if (!p) continue;
-                p->flesh = p->_maxHealth;
-                if (stunMode == 1) p->fleshStun = p->_maxHealth;
-                else if (stunMode == 2) p->fleshStun = 0.0f;
+                float maxHealth = KP_FIELD(p, MedicalSystem::HealthPartStatus, _maxHealth);
+                KP_FIELD(p, MedicalSystem::HealthPartStatus, flesh) = maxHealth;
+                if (stunMode == 1) KP_FIELD(p, MedicalSystem::HealthPartStatus, fleshStun) = maxHealth;
+                else if (stunMode == 2) KP_FIELD(p, MedicalSystem::HealthPartStatus, fleshStun) = 0.0f;
                 p->updateDerivedHealths();
                 ++r->parts;
             }
-            r->bloodBefore = m->blood;
-            m->blood = m->getMaxBlood();
-            m->currentBleedRate = 0.0f;
-            r->bloodAfter = m->blood;
+            r->bloodBefore = KP_FIELD(m, MedicalSystem, blood);
+            KP_FIELD(m, MedicalSystem, blood) = m->getMaxBlood();
+            KP_FIELD(m, MedicalSystem, currentBleedRate) = 0.0f;
+            r->bloodAfter = KP_FIELD(m, MedicalSystem, blood);
             return true;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
@@ -832,15 +818,15 @@ namespace
     __declspec(noinline) GameData* FindData(GameWorld* gw, const char* key, int type)
     {
         std::string k(key);
-        GameData* d = gw->gamedata.getDataByName(k, (itemType)type);
-        if (!d) d = gw->gamedata.getData(k, (itemType)type);   // string ID
+        GameData* d = KP_FIELD(gw, GameWorld, gamedata).getDataByName(k, (itemType)type);
+        if (!d) d = KP_FIELD(gw, GameWorld, gamedata).getData(k, (itemType)type);   // string ID
         return d;
     }
 
     __declspec(noinline) Item* MakeItem(GameWorld* gw, GameData* gd)
     {
         hand none;
-        return gw->theFactory->createItem(gd, none, NULL, NULL, -1, NULL);
+        return KP_FIELD(gw, GameWorld, theFactory)->createItem(gd, none, NULL, NULL, -1, NULL);
     }
 
     // 0 ok, 1 no such data, 2 factory gave nothing, 3 inventory refused (dropped), -1 faulted
@@ -908,8 +894,13 @@ namespace
         if (strcmp(cmd, "characters") == 0) return DoCharacters(gw);
         if (strcmp(cmd, "nearby") == 0) return DoNearby(gw, line);
         if (strcmp(cmd, "health") == 0) return DoHealth(gw, line);
-        if (strcmp(cmd, "inventory") == 0) return DoInventory(gw, line);
+        if (strcmp(cmd, "inventory") == 0)
+            return kp::FeatureOn("optional:probe-inventory") ? DoInventory(gw, line)
+                                                            : ErrorReply("inventory is off: its addresses are not proven for this build");
         if (strcmp(cmd, "find_items") == 0) return DoFindItems(gw, line);
+        bool write = strcmp(cmd, "heal") == 0 || strcmp(cmd, "teleport") == 0 || strcmp(cmd, "spawn_item") == 0;
+        if (write && !kp::FeatureOn("optional:probe-write"))
+            return ErrorReply("write commands are off: their addresses are not proven for this build");
         if (strcmp(cmd, "heal") == 0) return DoHeal(gw, line);
         if (strcmp(cmd, "teleport") == 0) return DoTeleport(gw, line);
         if (strcmp(cmd, "spawn_item") == 0) return DoSpawnItem(gw, line);
