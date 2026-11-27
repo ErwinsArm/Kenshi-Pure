@@ -14,6 +14,7 @@
 #include <kenshi/Globals.h>
 
 #include "Log.h"
+#include "Display.h"
 #include "Probe.h"
 
 #define KP_VERSION "0.0.1-m0"
@@ -261,6 +262,7 @@ __declspec(dllexport) void startPlugin()
         kp::Log("AnarchyKenshi is loaded in this game - staying inactive (switch it off for KenshiPure runs)");
         return;
     }
+    kp::DisplayFixStart();  // window calls only; independent of the game build
     if (!BuildCheck()) return;
 
     // Take the function's address from KenshiLib.dll's export, not `&GameWorld::...`: without

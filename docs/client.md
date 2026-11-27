@@ -58,3 +58,18 @@ Read-only by default. `heal`, `teleport` and `spawn_item` change the single-play
 when `mods\KenshiPure\KenshiPure.cfg` holds `probe_write=1` (written by `install-client.ps1 -ProbeWrite`,
 removed by a plain install or `-Uninstall`). Port bound to loopback; other programs on the same PC can
 still connect (no authentication), so keep writes off when not testing.
+
+# Client plugin: display fix
+
+Source: `client/Display.cpp`. Kenshi can start full screen in a smaller, stretched mode until Alt+Enter
+(seen by the user: first frame 1680x1050 on a 1920x1080 screen, `kenshi.cfg` asking for 1920x1080 full
+screen). When `kenshi.cfg` says `Full Screen=Yes` and `KenshiPure.cfg` has no `display_fix=0`, a worker
+thread waits until the game window is in front and answers messages (3 checks, 0.5 s apart), then
+minimizes it and restores it after 0.7 s, as AnarchyKenshi does after start
+([findings](findings/AnarchyKenshi.dll.md), section 5). The log line `display: before` / `after` shows
+window, client, monitor and display-mode sizes and DPI. Not yet run in game.
+
+Our plugin is loaded by RE_Kenshi as a post-load plugin (RE_Kenshi log: plugin at ~7.5 s, first shader
+compile at ~5.3 s), so the swap chain already exists; AnarchyKenshi's other part, changing the full-screen
+request in `IDXGIFactory::CreateSwapChain`, needs RE_Kenshi's `PreloadPlugins` list (loaded at ~1.5 s;
+whether that is before the window is created is not measured).
