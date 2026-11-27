@@ -99,7 +99,7 @@ namespace
     {
     public:
         FakeGame() : haveLocal(true), epoch(1), charEpoch(0), paused(false), haveNpc(true), bodyResolves(true), applyOk(true),
-                     picks(0), releases(0), releasesWorldGone(0), aiSkip(false), tick(0)
+                     picks(0), releases(0), releasesWorldGone(0), aiSkip(false), walked(false), tick(0)
         {
             std::memset(local, 0, sizeof(local));
             body[0] = 50.0f; body[1] = 10.0f; body[2] = 0.0f;
@@ -132,13 +132,14 @@ namespace
             if (!bodyResolves) return false;
             for (int i = 0; i < 3; ++i) out->pos[i] = body[i];
             out->speed = 0.0f;
-            out->moving = 0;
+            out->moving = walked ? 1 : 0;
             return true;
         }
         bool StandInApply(const DriveCmd& c, int)
         {
             cmds.push_back(c);
             if (!applyOk) return false;
+            if (c.kind == DC_WALK) walked = true;
             if (c.kind == DC_PLACE || c.kind == DC_SNAP)
                 for (int i = 0; i < 3; ++i) body[i] = c.pos[i];
             return true;
@@ -169,6 +170,7 @@ namespace
         bool paused, haveNpc, bodyResolves, applyOk;
         int picks, releases, releasesWorldGone;
         bool aiSkip;
+        bool walked;
         unsigned long long tick;
         float local[3], body[3];
         std::vector<DriveCmd> cmds;
@@ -213,6 +215,9 @@ namespace
         CHECK(c.snapDist == 120.0f);
         CHECK(std::strcmp(c.name, "Beep") == 0);
         CHECK(c.pickDist == 600.0f);   // 5 is out of range: default kept
+        CHECK(c.settleMs == 0);
+        DriveParseConfig("standin_settle=5", &c);
+        CHECK(c.settleMs == 5000);
         DriveParseConfig("standin=order", &c);
         CHECK(c.mode == DM_ORDER);
         DriveParseConfig("standin=jump\n#standin=place\nstandin_ai=none", &c);
@@ -321,6 +326,7 @@ namespace
         DriveConfig c;
         DriveParseConfig("", &c);
         c.mode = mode;
+        c.settleMs = 0;
         return c;
     }
 
@@ -352,7 +358,8 @@ namespace
             Run(nf, now, 1000, &bot, 7);
             CHECK(nf.StandInDriving() && g.picks == 1);
             CHECK(nf.StandInMode() == DM_PLACE && g.aiSkip);
-            CHECK(g.Count(DC_HALT) == 1 && g.Count(DC_PLACE) >= 5);
+            CHECK(g.Count(DC_HALT) == 2 && g.Count(DC_PLACE) >= 5);   // wake-up halt, place halt
+            CHECK(g.Logged("standin: waking it up") && g.Logged("standin: it moves"));
             // Placed onto the target: the body follows the circle.
             Run(nf, now, 2000, &bot, 7);
             CHECK(g.Logged("standin: driving Npc"));
@@ -439,6 +446,27 @@ namespace
             int n = 0;
             for (size_t i = 0; i < g.lines.size(); ++i) n += g.lines[i].find("no NPC to drive") != std::string::npos ? 1 : 0;
             CHECK(!nf.StandInDriving() && n == 2);
+            nf.Stop();
+            g_core.poses.clear();
+        }
+        {   // settle: no pick until the world has been the same for settleMs, again after a load
+            FakeGame g;
+            NetFrame nf;
+            DriveConfig c = Cfg(DM_PATH);
+            c.settleMs = 5000;
+            nf.SetDrive(c);
+            CHECK(nf.Start(&api, cc, &g));
+            Bot bot;
+            PushJoin(7, "bot");
+            Run(nf, now, 4000, &bot, 7);
+            CHECK(!nf.StandInDriving() && g.picks == 0);
+            Run(nf, now, 3000, &bot, 7);
+            CHECK(nf.StandInDriving() && g.picks == 1);
+            ++g.epoch;   // a load
+            Run(nf, now, 4000, &bot, 7);
+            CHECK(!nf.StandInDriving() && g.picks == 1);
+            Run(nf, now, 3000, &bot, 7);
+            CHECK(nf.StandInDriving() && g.picks == 2);
             nf.Stop();
             g_core.poses.clear();
         }

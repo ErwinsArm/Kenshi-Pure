@@ -22,6 +22,7 @@ namespace kp
         float snapDist;     // x/z gap that snaps the body onto the target; cfg standin_snap (default 150)
         float pickDist;     // stand-in must be this close to the local character; cfg standin_range (default 600)
         char name[64];      // cfg standin_name: pick this NPC by exact name (case-insensitive); empty = nearest
+        unsigned int settleMs;   // no pick sooner than this after a world change; cfg standin_settle (s, default 0)
     };
 
     // Reads the standin* keys of a KenshiPure.cfg text; unknown values keep the defaults.
@@ -77,6 +78,12 @@ namespace kp
         float pos[3];
         float speed;       // AbstractMovementBase::currentSpeed
         int moving;        // currentlyMoving
+        // For the log only: what limits its speed. CharMovement::update passes min(desired, max) on
+        // (1.0.65 0x65f5c7, M); max is set from the character each periodic update (0x66036c, M).
+        float desired;     // desiredSpeed (+0xBC)
+        float maxSpeed;    // maxSpeed (+0xB4)
+        float walkSpeed;   // walkSpeed (+0xC0): what MoveSpeed WALK sets desired to (0x6646e6, M)
+        int speedOrders;   // MoveSpeed: 0 walk, 1 jog (desired 55), 2 run / 3 grouped (999), 4 no change
     };
 
     struct DriveStats

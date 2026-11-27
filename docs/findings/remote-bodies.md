@@ -154,8 +154,8 @@ catch-up speed proportional to the gap, capped at 2.5×.
 
 Speed: `setDesiredSpeed(float)` only stores the float at `CharMovement+0xBC` (1.0.68 `0x3332f0`,
 **M** by the critic); KL names `+0xB8` `currentSpeed` and `+0xBC` `desiredSpeed`. Unit: world units
-per game second (M1, [client.md](../client.md) "Own pose"; the player walks ~72). For an NPC the float does
-not set the walk speed: in the M4 run it walked at 15.0 with 60–150 asked (**M**); what limits it is open.
+per game second (M1, [client.md](../client.md) "Own pose"; the player walks ~72). The speed orders override
+it for NPCs and the max speed caps it (below).
 
 No source ran the M4 chain (spawned body + AI skip + one of these drives) on 1.0.65. M4 tries two
 candidates on the same stand-in and keeps the one that looks right:
@@ -166,11 +166,13 @@ candidates on the same stand-in and keeps the one that looks right:
 - **B (direct steer):** AK's shipped way: every frame `setDirectMovement(direction, limit)` and
   `setDesiredSpeed`, place with `_setPositionSimple` + `teleportVisuallyOnly` when off.
 
-First M4 run on 1.0.65 (an existing NPC, [client.md](../client.md) "Stand-in body (M4)", **M**): each half of
-A alone moves the body (`CharMovement::setDestination` with the AI skipped; `Character::setDestination`
-with the AI on), but only at 15 units/s; B as called (velocity vector, limit = per-step distance cap) moved
-it only 20 % of the time. Skipping `AI::periodicUpdate` ran without fault; the AI tick runs on another
-thread than the frame thread.
+M4 runs on 1.0.65 (an existing NPC, [client.md](../client.md) "Stand-in body (M4)", **M**): `Character::setDestination`
+with the NPC's AI on moved it 95 % of the time (gap ~107 at 50 units/s, 2 snaps in 45 s); `CharMovement::setDestination`
+alone with the AI skipped 53 % (21 snaps); B (`setDirectMovement`) 88 % but with nonsense speeds and a glitchy look.
+Speed: set the speed orders to RUN (`setDesiredSpeedOrders`) before `setDesiredSpeed(float)`, else an NPC walks at
+its walk speed (15); the body is capped at its own max speed (`+0xB4`, ~52). Skipping `AI::periodicUpdate` ran
+without fault (the AI tick runs on another thread than the frame thread); a busy NPC needs its AI on to get up.
+**Use for M5: the walk order with the AI on, teleport snap.**
 
 ## Removal
 

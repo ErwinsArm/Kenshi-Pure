@@ -183,10 +183,10 @@ the core DLL (M3)"; the core split (step 6 of the loader plan) is `KenshiPureCor
 - In game (user): server + bot on the same PC; Kenshi log shows the bot's circle, server log shows
   the user's walk; a save load does not drop the connection.
 
-**M4 – drive a stand-in body** (M; needs G2, G5, G4 partly) — **in progress** (built, tested without
-the game, one user run: placing follows the circle, the save load is clean, but the walk stays at 15 units/s
-so the body falls behind and snaps every few seconds; direct steering barely moves it). Design, result and
-next step: [client.md](client.md) "Stand-in body (M4)".
+**M4 – drive a stand-in body** (M; needs G2, G5, G4 partly) — **done** (a borrowed NPC follows the bot's
+circle; the walk order with the NPC's own AI on works best, path with the AI skipped and direct steering do
+not; a body is never faster than its own max speed; busy NPCs need their AI to get up). Details:
+[client.md](client.md) "Stand-in body (M4)". In-game tests run unattended with `scripts/run-game-test.ps1`.
 - The stand-in is a body outside the local player's squad: one spawned with the G3 recipe or a
   nearby NPC (a player-squad member takes a different move call, remote-bodies.md G5). Drive it
   from the bot's poses: first place it each

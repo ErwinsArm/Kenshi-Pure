@@ -85,7 +85,7 @@ namespace kp
         : api_(0), core_(0), game_(0), lastTick_(0), haveEpoch_(false),
           epoch_(0), epochStart_(0), firstOfEpochDropped_(false), settled_(false),
           localOk_(false), localEpoch_(0), localPaused_(false), trackId_(0), siOn_(false), siEpoch_(0),
-          nextPick_(0), lastStatus_(0), lastNoPickLog_(0), phaseStart_(0), phase_(0), phaseAiSkip_(false),
+          seenEpoch_(0), epochSince_(0), nextPick_(0), lastStatus_(0), lastNoPickLog_(0), phaseStart_(0), phase_(0), phaseAiSkip_(false), waking_(false),
           applyFails_(0), lastGap_(0.0f)
     {
         memset(&stats_, 0, sizeof(stats_));
@@ -362,6 +362,11 @@ namespace kp
     void NetFrame::DriveFrame(unsigned long long nowMs)
     {
         if (drive_.mode == DM_OFF || !game_) return;
+        if (localOk_ && (epochSince_ == 0 || localEpoch_ != seenEpoch_))
+        {
+            seenEpoch_ = localEpoch_;
+            epochSince_ = nowMs;
+        }
         bool fresh = !track_.Empty() && nowMs - track_.LastAddMs() <= (unsigned long long)kRemoteStaleMs;
         if (siOn_)
         {
@@ -373,7 +378,16 @@ namespace kp
             memset(&b, 0, sizeof(b));
             if (!game_->StandInRead(&b)) { Release(nowMs, true, "its handle no longer resolves"); return; }
             lastBody_ = b;
-            if (drive_.mode == DM_CYCLE && nowMs - phaseStart_ >= kCycle[phase_].ms)
+            // Wake-up: a picked NPC may be busy (sitting, working: it stood 33 units above the ground) and
+            // ignored teleports and walk orders while its AI was skipped, also 60 s after the load; with
+            // the AI on, an order moved it at once (M4 runs, M). So: AI on and orders until it moves.
+            if (waking_ && (b.moving || nowMs - phaseStart_ >= (unsigned long long)kWakeMaxMs))
+            {
+                waking_ = false;
+                Logf("standin: %s after %.1f s; the drive starts", b.moving ? "it moves" : "it did not move", (float)(nowMs - phaseStart_) / 1000.0f);
+                StartPhase(nowMs, 0);
+            }
+            else if (!waking_ && drive_.mode == DM_CYCLE && nowMs - phaseStart_ >= kCycle[phase_].ms)
             {
                 LogPhaseSummary("done");
                 StartPhase(nowMs, (phase_ + 1) % kCycleCount);
@@ -395,13 +409,16 @@ namespace kp
             if (nowMs - lastStatus_ >= (unsigned long long)kStatusMs)
             {
                 lastStatus_ = nowMs;
-                Logf("standin: %s %s body %.1f %.1f %.1f target %.1f %.1f %.1f gap %.1f speed %.1f moving %d last %s",
+                Logf("standin: %s %s body %.1f %.1f %.1f target %.1f %.1f %.1f gap %.1f speed %.1f (asked %.1f, desired %.1f, "
+                     "max %.1f, walk %.1f, orders %d) moving %d last %s",
                      DriveModeName(planner_.Mode()), si_.name, b.pos[0], b.pos[1], b.pos[2], target.pos[0], target.pos[1],
-                     target.pos[2], lastGap_, b.speed, b.moving, CmdName(lastCmd_.kind));
+                     target.pos[2], lastGap_, b.speed, lastCmd_.speed, b.desired, b.maxSpeed, b.walkSpeed, b.speedOrders, b.moving,
+                     CmdName(lastCmd_.kind));
             }
             return;
         }
         if (!localOk_ || !fresh || nowMs < nextPick_) return;
+        if (nowMs - epochSince_ < (unsigned long long)drive_.settleMs) return;   // the world is still settling after a load
         nextPick_ = nowMs + kPickEveryMs;
         StandInInfo info;
         memset(&info, 0, sizeof(info));
@@ -422,6 +439,13 @@ namespace kp
         memset(&lastCmd_, 0, sizeof(lastCmd_));
         Logf("standin: driving %s (%.0f units away, at %.1f %.1f %.1f) from remote player %u, mode %s", si_.name,
              si_.distance, si_.home[0], si_.home[1], si_.home[2], trackId_, DriveModeName(drive_.mode));
-        StartPhase(nowMs, 0);
+        // Wake it up first (see DriveFrame): the order mode with its own AI on.
+        waking_ = true;
+        phase_ = 0;
+        phaseStart_ = nowMs;
+        phaseAiSkip_ = false;
+        planner_.Reset(DM_ORDER, drive_.snapDist);
+        game_->StandInSkipAi(false);
+        Logf("standin: waking it up (own AI on, walk orders until it moves)");
     }
 }

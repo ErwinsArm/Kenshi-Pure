@@ -64,6 +64,7 @@ namespace kp
         cfg->aiSkip = DA_AI;
         cfg->snapDist = 300.0f;
         cfg->pickDist = 600.0f;
+        cfg->settleMs = 0;
         const char* p = text ? text : "";
         while (*p)
         {
@@ -95,6 +96,11 @@ namespace kp
                 {
                     float v = (float)atof(val);
                     if (v >= 10.0f && v <= 100000.0f) cfg->pickDist = v;
+                }
+                else if (strcmp(key, "standin_settle") == 0)
+                {
+                    long v = strtol(val, NULL, 10);
+                    if (v >= 0 && v <= 600) cfg->settleMs = (unsigned int)v * 1000;
                 }
                 else if (strcmp(key, "standin_name") == 0)
                 {

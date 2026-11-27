@@ -29,6 +29,7 @@
 #include <kenshi/GameData.h>
 #include <kenshi/GameDataManager.h>
 #include <kenshi/RootObjectFactory.h>
+#include <kenshi/SaveManager.h>
 #include <kenshi/util/hand.h>
 
 #include "Sites.h"

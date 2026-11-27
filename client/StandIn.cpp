@@ -190,6 +190,10 @@ namespace
             AbstractMovementBase* m = cm;
             out->speed = KP_FIELD(m, AbstractMovementBase, currentSpeed);
             out->moving = KP_FIELD(m, AbstractMovementBase, currentlyMoving) ? 1 : 0;
+            out->desired = KP_FIELD(m, AbstractMovementBase, desiredSpeed);
+            out->maxSpeed = KP_FIELD(m, AbstractMovementBase, maxSpeed);
+            out->walkSpeed = KP_FIELD(m, AbstractMovementBase, walkSpeed);
+            out->speedOrders = (int)KP_FIELD(m, AbstractMovementBase, speedOrders);
             return true;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
@@ -225,11 +229,15 @@ namespace
         Ogre::Vector3 v(p[0], p[1], p[2]);
         if (order) c->setDestination(v, false);
         else cm->_NV_setDestination(v, HIGH_PRIORITY, false);
+        // RUN first: the move task puts desired back from the speed orders (restoreDesiredSpeed inlined in
+        // CharBody::_move, 1.0.65 0x5c5ecc, M), and an NPC's orders are usually WALK (its walk speed).
+        cm->setDesiredSpeedOrders(RUN);
         cm->setDesiredSpeed(speed);
     }
     __declspec(noinline) void DoSteer(CharMovement* cm, const float* vel, float speed, float limit)
     {
         Ogre::Vector3 v(vel[0], vel[1], vel[2]);
+        cm->setDesiredSpeedOrders(RUN);
         cm->setDesiredSpeed(speed);
         cm->setDirectMovement(v, limit);
     }
@@ -295,7 +303,9 @@ namespace kp
             KPS_Character__setDestination, KPS_CharMovement__setDestination, KPS_AbstractMovementBase__setDesiredSpeed,
             KPS_CharMovement__setDirectMovement, KPS_CharMovement__setPositionDirectionAndTeleport,
             KPS_CharMovement__setPositionSimple, KPS_Character__teleportVisuallyOnly, KPS_CharMovement__halt,
-            KPS_AI__periodicUpdate, KPS_Character__periodicUpdate,
+            KPS_AI__periodicUpdate, KPS_Character__periodicUpdate, KPS_AbstractMovementBase__setDesiredSpeedOrders,
+            KPS_AbstractMovementBase__desiredSpeed, KPS_AbstractMovementBase__maxSpeed, KPS_AbstractMovementBase__walkSpeed,
+            KPS_AbstractMovementBase__speedOrders,
         };
         for (size_t i = 0; i < sizeof(need) / sizeof(need[0]); ++i)
             if (!SiteOk(need[i]))

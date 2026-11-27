@@ -75,7 +75,7 @@ namespace kp
     {
     public:
         enum { kRemoteLogMs = 1000, kSettleMaxMs = 2000, kMaxPlayers = 64 };
-        enum { kPickEveryMs = 2000, kRemoteStaleMs = 3000, kStatusMs = 1000, kMaxApplyFails = 3 };
+        enum { kPickEveryMs = 2000, kRemoteStaleMs = 3000, kStatusMs = 1000, kMaxApplyFails = 3, kWakeMaxMs = 20000 };
 
         NetFrame();
         // Stand-in driving (M4); off unless cfg.mode says otherwise. Call before Start.
@@ -144,9 +144,12 @@ namespace kp
         bool siOn_;
         StandInInfo si_;
         unsigned int siEpoch_;
+        unsigned int seenEpoch_;          // world epoch last seen, and since when
+        unsigned long long epochSince_;
         unsigned long long nextPick_, lastStatus_, lastNoPickLog_, phaseStart_;
         int phase_;
         bool phaseAiSkip_;
+        bool waking_;                    // after a pick: AI on and walk orders until the body moves once
         int applyFails_;
         float lastGap_;
         BodyState lastBody_;
