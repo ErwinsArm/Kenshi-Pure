@@ -88,7 +88,7 @@ Install into a Kenshi folder (RE_Kenshi optional; switches AnarchyKenshi off; `-
 powershell -ExecutionPolicy Bypass -File scripts\install-client.ps1 -GameDir "<Kenshi folder>"
 ```
 
-The plugin writes `<Kenshi>\mods\KenshiPure\KenshiPure.log`. Kenshi's own crash dumps land in the
+The loader writes `<Kenshi>\mods\KenshiPure\KenshiPureLoader.log`, the plugin `KenshiPure.log` next to it. Kenshi's own crash dumps land in the
 game folder as `crashDump<version>_x64.dmp`. Tests of the install script:
 `powershell -ExecutionPolicy Bypass -Command "Import-Module Pester -RequiredVersion 3.4.0; Invoke-Pester scripts\tests"`.
 Removal: `scripts\setup-build.ps1 -Uninstall`.
