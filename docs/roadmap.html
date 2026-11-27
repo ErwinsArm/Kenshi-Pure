@@ -108,12 +108,12 @@ h2{font-size:1.25rem}
 // Edit this object to update the page. status: done | now | todo
 const DATA = {
   updated: "27 November 2026",
-  now: "Building our own starter (M0b): the mod will start by itself on every Kenshi version, without RE_Kenshi. Then M1.",
-  you: "Nothing right now. The starter is built in its own session; when it needs a test in the game (RE_Kenshi on and off), Claude tells you exactly what to do.",
+  now: "Our own starter (M0b) is built and checked without the game: it no longer needs RE_Kenshi or KenshiLib. It waits for your test runs. Then M1.",
+  you: "Three short test runs in the game (RE_Kenshi on, RE_Kenshi off, each with ReShade as you have it): start Kenshi normally, check the picture fills the screen without Alt+Enter, load a save, wait a minute, close the game. Claude reads the logs after each run.",
   phases: [
     {name:"Learn from the old mod", note:"Read AnarchyKenshi to learn how a Kenshi multiplayer works. We only look; we never copy or run its files.", steps:[
       {tag:"L1", name:"How it talks to the server", status:"done", d:"All ~60 message types and the login are known."},
-      {tag:"L2", name:"Where Kenshi's functions are", status:"done", d:"795 places in the game (move a character, save the game, ...) found for Steam's game file (1.0.68). Your game actually runs 1.0.65, so our mod finds them through KenshiLib instead."},
+      {tag:"L2", name:"Where Kenshi's functions are", status:"done", d:"795 places in the game (move a character, save the game, ...) found for Steam's game file (1.0.68). They show us where to look; our mod keeps its own list, checked in both game versions."},
       {tag:"L3", name:"The 48 synced game areas", status:"done", d:"Traders, squads, injuries, weather and more: the data format of every area is written down."},
       {tag:"L4", name:"Details we need later", status:"done", d:"How another player's character is created, made to walk and removed: worked out from four sources, ready for steps M4 and M5."}
     ]},
@@ -124,7 +124,7 @@ const DATA = {
     ]},
     {name:"Build: two players see each other walk", note:"The first playable version, in small steps. Each step is tested before the next one starts.", steps:[
       {tag:"M0", name:"Our mod starts in Kenshi", status:"done", d:"Tested by you: the mod loads, checks your game version (1.0.65), runs in every frame and reads values from the game without errors, also across a new game and a reload."},
-      {tag:"M0b", name:"Our own starter, no RE_Kenshi needed", status:"now", d:"The mod starts by itself, early, on Steam's normal Kenshi (1.0.68) and on 1.0.65, with or without RE_Kenshi, like AnarchyKenshi. Also fixes the stretched full-screen picture. Built like AnarchyKenshi: it finds the game's functions itself and checks every find. Plan checked twice by two critics (docs/plan-own-loader.md). Steps: toolchain, address finder for 1.0.65, then 1.0.68, own starter with the picture fix, test runs by you."},
+      {tag:"M0b", name:"Our own starter, no RE_Kenshi needed", status:"now", d:"The mod starts by itself, early, on Steam's normal Kenshi (1.0.68) and on 1.0.65, with or without RE_Kenshi, like AnarchyKenshi, and fixes the stretched full-screen picture. Done: tools; our own address list (all 57 game places the mod uses, each checked in both game versions by a script and by two critics; none moved in a way that matters); the mod no longer uses KenshiLib; our own starter with the picture fix and installer. Left: your test runs (RE_Kenshi on and off). One small part, the inventory view of the probe, stays off on 1.0.68 for now."},
       {tag:"M1", name:"Read your own position", status:"todo", d:"The mod knows where your character stands and where it walks."},
       {tag:"M2", name:"Our own small server", status:"todo", d:"A small program on your PC that passes positions between players, plus a test bot."},
       {tag:"M3", name:"Send and receive positions", status:"todo", d:"Your game and the server talk to each other while you play."},
@@ -144,9 +144,9 @@ const DATA = {
     {name:"Findings notes", d:"Everything learned from the old mod, in docs/findings."},
     {name:"Kenshi function map", d:"795 game functions with their places in Steam's 1.0.68 file (a reference; your game runs 1.0.65)."},
     {name:"Live game probe", d:"Claude can read your running game (status; your characters and everyone nearby with position, faction, health and knocked-out state; the mod log) during tests, only on your PC. Tried in game: healing and teleport work (not while paused); creating items works, but weapons fail and bigger amounts come out wrong. Next: a cheat menu inside the game for you."},
-    {name:"Our mod KenshiPure", d:"Builds on your PC with one command, installs with one command, and switches AnarchyKenshi off and on again."},
+    {name:"Our mod KenshiPure", d:"Builds on your PC with one command, installs with one command, and switches AnarchyKenshi off and on again. Starts by itself (no RE_Kenshi needed) and keeps its own checked list of the game's functions for Kenshi 1.0.65 and 1.0.68."},
     {name:"Message formats", d:"How the old mod's server and game talk, field by field."},
-    {name:"RE_Kenshi and KenshiLib", d:"Installed on your PC; a toolkit our mod still uses today. Goal: no longer needed after step M0b."},
+    {name:"RE_Kenshi and KenshiLib", d:"Installed on your PC. Our mod no longer needs them; KenshiLib's files only help us build our own address list."},
     {name:"KenshiCoop", d:"Another co-op mod for your Kenshi version whose code we may reuse."},
     {name:"Knowledge map", d:"The colored tile map: how much we know about the old mod."}
   ]

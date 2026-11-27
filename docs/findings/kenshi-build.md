@@ -21,13 +21,15 @@ running game is the 1.0.65 copy:
   is **I**; our plugin logs the path and hash of the running exe on every start, which settles it.
 
 Consequence: the Steam RVAs in [kenshi-sites.tsv](kenshi-sites.tsv) and [hooks.md](hooks.md) are
-for the 1.0.68 exe (`a596…`) and do **not** apply to the game as the user runs it. Our plugin finds
-Kenshi code through KenshiLib (below), which knows only the 1.0.65 exes, Steam and GOG (MD5 map in
+for the 1.0.68 exe (`a596…`) and do **not** apply to the game as the user runs it. KenshiLib (below)
+knows only the 1.0.65 exes, Steam and GOG (MD5 map in
 `Source/kenshi/Kenshi.cpp`, RVA files `Steam_1.0.65.br` / `GOG_1.0.65.br`, **M**). RE_Kenshi supports
 a 1.0.68 install by making a 1.0.65-compatible exe in `RE_Kenshi\` (**D**, RE_Kenshi README); no
-KenshiLib release up to v0.5.1 mentions 1.0.68 (**D**, GitHub releases).
+KenshiLib release up to v0.5.1 mentions 1.0.68 (**D**, GitHub releases). KenshiPure therefore no longer
+uses KenshiLib at run time: its own table `client/sites.tsv` holds every address for both exes, proven
+by script ([client.md](../client.md), "Address layer"), and its loader is an Ogre plugin.
 
-## RE_Kenshi plugins
+## RE_Kenshi plugins (how KenshiPure started up to M0)
 
 - An RE_Kenshi plugin is a mod folder `mods/<Name>/` with `<Name>.mod`, `RE_Kenshi.json`
   (`{"Plugins": ["X.dll"]}`) and the DLL; the mod must be enabled in the game's mod list
@@ -55,10 +57,11 @@ KenshiLib release up to v0.5.1 mentions 1.0.68 (**D**, GitHub releases).
   `GameWorld::getFrameSpeedMultiplier` comment `0x66BFE0` is padding in the 1.0.65 exe, by the
   critic, **M**); calls go through KenshiLib's exports, which map the address at run time (**D**).
 - Our setup: `scripts/setup-build.ps1` unpacks the compiler from Microsoft's Windows SDK 7.1 ISO with
-  `msiexec /a` (files only). Result: `cl.exe` 16.00.30319.01 (VS2010 RTM), and a plugin that imports
-  `MSVCR100.dll` and `KenshiLib.dll` and exports `?startPlugin@@YAXXZ` (**M**, `dumpbin`).
+  `msiexec /a` (files only). Result: `cl.exe` 16.00.30319.01 (VS2010 RTM); MinHook 1.3.4 compiles with
+  it (**M**). Today's DLLs import `MSVCR100.dll` and not `KenshiLib.dll` (**M**, `dumpbin`).
 - `KenshiLib::GetRealAddress(&Class::method)` only works with whole-program optimisation; without
   it the compiler passes a jump stub in the plugin's own DLL and KenshiLib stops the game with an
-  assertion box (**M**, first M0 run). Our plugin takes the address from KenshiLib.dll's export
-  instead (`GetProcAddress(KenshiLib.dll, "<mangled name>")`), which does not depend on that option.
+  assertion box (**M**, first M0 run).
+- Kenshi's exe is linked incrementally: vtable slots point to `jmp rel32` thunks, not to the functions
+  (**M**, Character vtable in both exes).
 - Not used: the VS2010 SP1 compiler update; KenshiLib.lib is an import library (**I**: version-independent).

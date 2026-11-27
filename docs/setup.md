@@ -82,7 +82,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-build.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build-plugin.ps1
 ```
 
-Install into a Kenshi with RE_Kenshi 0.3.5 (switches AnarchyKenshi off; `-Uninstall` switches back):
+Install into a Kenshi folder (RE_Kenshi optional; switches AnarchyKenshi off; `-Uninstall` switches back):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install-client.ps1 -GameDir "<Kenshi folder>"

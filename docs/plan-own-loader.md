@@ -35,12 +35,16 @@ critics reviewed this design twice. Labels: **M** measured, **D** documented, **
 - Ogre plugin (`dllStartPlugin`/`dllStopPlugin`), line appended after `Plugin=RE_Kenshi` if present;
   pins itself against unload; single instance per process; logs pid, exe path, SHA-256.
 - AK detection by reading `Plugins_x64.cfg` (AK may load after us), not by `GetModuleHandle`.
-- Order: display hook → address layer → `KenshiPure.dll` through a versioned C interface
-  (`kpStart(const KpHost*)`, the struct carries a version and the resolved slot table).
+- Order: display fix armed → `KenshiPure.dll` through a versioned C interface (`kpStart(const KpHost*)`,
+  the struct carries a version, the exe's hash and path); KenshiPure resolves the address layer first
+  thing in `kpStart`, before any hook (one copy of the resolver and of MinHook's game hooks; the loader
+  stays thin).
 
 ### 2. Display fix
 Hook `IDXGIFactory::CreateSwapChain` on the factory object the game actually receives (ReShade may
-wrap it); inside the first call hook `ResizeTarget` once. Full screen in `kenshi.cfg` → `Scaling =
+wrap it); inside the first call hook `ResizeTarget` once. Armed in `Ogre::Root::initialise` (which
+creates the window; Kenshi imports it), never by loading `dxgi.dll` ourselves: a `dxgi.dll` loaded
+before Ogre's render system would keep ReShade's wrapper from loading. Full screen in `kenshi.cfg` → `Scaling =
 UNSPECIFIED`; log before/after. Minimize-restore (`client/Display.cpp`) stays as fallback.
 
 ### 3. Address layer
@@ -52,9 +56,11 @@ proven). Kinds: `code` (function), `global` (from a RIP-relative operand of a ma
 - **Known build** (SHA-256 match): check every row's pattern at its recorded address; mismatch →
   row unresolved.
 - **Shift check**: a 1.0.68 address must equal the 1.0.65 address plus its neighbours' block shift
-  and keep the order of its neighbours; anything else is rejected, even a unique hit.
-- **Unknown build**: scan the exe file for patterns, apply the same shift/order check, but run only
-  the display fix and read-only features: layouts are unproven there.
+  and keep the order of its neighbours; a function start between two blocks also passes when its
+  whole body is identical (functions change size inside blocks, measured); anything else is rejected,
+  even a unique hit. Patterns are checked in the exe file, not in memory (other mods hook in memory).
+- **Unknown build**: scan the exe file for patterns, order and neighbour-shift check, but run only
+  the display fix: no game hook is installed there (a wrong hit would patch the wrong function).
 - Every slot is pre-filled with a trap stub that logs the name; nothing ever jumps to 0 or the image base.
 - `required` rows missing → KenshiPure stays inactive (log says which). `optional` rows → the feature
   is off, and the feature set is sent to the server at login so no client silently desyncs.
@@ -86,6 +92,18 @@ AK's decompile (REA/Ghidra) stays our guide for *where* to intervene for each pl
 (loading and movement speed, inventory, shops, the thread-local patch table) and how AK did it;
 each site we need is then rebuilt and proven in our own table.
 
+## Core split (step 6, for M2)
+
+Built when the first protocol code is written (M2); before that the core would be empty.
+- `KenshiPureCore.dll`, modern MSVC (v143), static CRT, no C++ types across its border; it never sees a
+  game pointer. It holds protocol, sync state, prediction, and later the code shared with the server.
+- Interface (`client/KpCore.h`, plain C, versioned like `KpHost`): `kpCoreStart(const KpCoreHost*)` →
+  `KpCore*`; per frame `kpCoreTick(core, const KpFrameIn*, KpFrameOut*)` with POD snapshots (own squad
+  positions and states in, orders for stand-in characters out); `kpCoreStop`. The host passes log and time.
+- The game adapter (VS2010: loader, address layer, hooks, KP_FIELD reads, game calls) builds the
+  snapshots on the frame thread and applies the outputs; nothing else crosses.
+- Toolchain: a pinned VS Build Tools or clang-cl in `setup-build.ps1` (chosen when M2 starts).
+
 ## Blind spots still open (need runs or data)
 
 - RE_Kenshi on/off and the plugin order: needs a user run with the loader's pid log.
@@ -103,4 +121,4 @@ each site we need is then rebuilt and proven in our own table.
 3. `sites.mjs` with shift check; 1.0.68 rows for everything KenshiPure uses; fields proven.
 4. Loader + display hook + installer line; RE_Kenshi `startPlugin` path removed.
 5. User runs: RE_Kenshi on / off, ReShade on: logs, full screen without Alt+Enter, probe works.
-6. Split out the modern-compiler core before M2 (server) starts.
+6. Split out the modern-compiler core before M2 (server) starts (planned above; built with M2).
