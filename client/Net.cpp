@@ -53,6 +53,7 @@ namespace
         bool RemoteVerify(int slot) { return kp::RemoteGameVerify(slot); }
         void RemoteFree(int slot) { kp::RemoteGameFree(slot); }
         void RemoteForgetAll() { kp::RemoteGameForgetAll(); }
+        void RemoteSweep() { kp::RemoteGameSweep(); }
     };
 
     GameAccess g_game;

@@ -117,6 +117,7 @@ namespace kp
         unsigned int Removes() const { return removes_; }
         unsigned int Forgets() const { return forgets_; }
         unsigned int Kept() const { return kept_; }
+        unsigned int Sweeps() const { return sweeps_; }
 
     private:
         Body* FindMutable(unsigned short id);
@@ -137,6 +138,8 @@ namespace kp
         IGameAccess* game_;
         Body bodies_[kMaxPlayers];
         bool worldLive_;
+        bool sweepPending_;              // a new world: sweep once it has settled
+        unsigned int sweeps_;
         bool haveEpoch_;
         unsigned int epoch_;
         unsigned long long worldSince_;

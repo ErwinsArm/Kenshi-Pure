@@ -55,7 +55,12 @@ State: M5 code committed as work in progress (builds, all 5 net tests pass incl.
   obstacles (speed 0, gap up to 260): mean 88.7. (First try ignored -Cfg: PowerShell `$Cfg` == `$cfg`; fixed with `$cfgSets`.)
 - New default `remote_drive=auto` (client/Remote.cpp SetMode): steer, switch to the walk order while stuck (gap > 40
   and speed < 20 for 0.4 s, or gap > 150), back to steer when gap < 15 for 1 s. kp-remote-test 67 checks pass.
-- Run 4 (auto): running.
+- Run 4 (auto): gap mean 45.5 (order 63, steer 89, M4 107), gap > 100 in 16 % of status lines (order 26 %), < 15 in 42 %;
+  60 status lines steering, 72 walking. Auto stays the default.
+- Run 5 (G7 without the guard, copy "KP TEST MP TEST": save at 40 s, load at 75 s): **the save kept the body**: after
+  the load the old hand resolved to "[KP] bot", No Faction ("kept 1 body"). So the guard is needed. Added: a sweep
+  once per world after it settled (`RemoteSweep`), so a kept body is removed even with nobody connected.
+- Run 6 (same with the guard on): running.
 - Peer note from the user: AK is only a reference; pick the drive by measurement (smoothest, least lag).
 
 ## Next steps (in order)

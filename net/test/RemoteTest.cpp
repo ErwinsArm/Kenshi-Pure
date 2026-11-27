@@ -195,6 +195,8 @@ namespace
         }
         void RemoteFree(int slot) { bodies.erase(slot); ++frees; }
         void RemoteForgetAll() { bodies.clear(); }
+        void RemoteSweep() { Call(); ++sweeps; }
+        int sweeps = 0;
 
         // Walk the bodies toward their destination for dt seconds (min(asked, max) speed).
         void Simulate(float dt)
@@ -437,9 +439,11 @@ namespace
             ++g.epoch;
             Run(nf, g, now, 100, ws);
             CHECK(g.verifies == 2 && g.destroys == 0 && g.Logged("kept 0 bodies, forgot 1"));
+            CHECK(g.sweeps == 1 && g.worldCalls == 0);   // the first world; the next sweep waits for the settle time
             CHECK(g.spawns == 1);   // not before the settle time
             Run(nf, g, now, 3500, ws);
             CHECK(g.spawns == 2 && g.Live() == 1 && g.destroys == 0);
+            CHECK(g.sweeps == 2);   // once per world change, after it settled
             nf.Stop();
             g_core.poses.clear();
         }

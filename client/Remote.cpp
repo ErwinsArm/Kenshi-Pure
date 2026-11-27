@@ -99,7 +99,7 @@ namespace kp
     }
 
     RemoteBodies::RemoteBodies()
-        : game_(0), worldLive_(false), haveEpoch_(false), epoch_(0), worldSince_(0), paused_(false), now_(0),
+        : game_(0), worldLive_(false), sweepPending_(false), sweeps_(0), haveEpoch_(false), epoch_(0), worldSince_(0), paused_(false), now_(0),
           spawns_(0), removes_(0), forgets_(0), kept_(0)
     {
         RemoteParseConfig("", &cfg_);
@@ -318,9 +318,13 @@ namespace kp
             haveEpoch_ = true;
             epoch_ = worldEpoch;
             worldSince_ = nowMs;
+            sweepPending_ = true;
         }
         else if (!worldLive_)
+        {
             worldSince_ = nowMs;   // back from the menu in the same epoch: settle again
+            sweepPending_ = true;
+        }
         worldLive_ = true;
         for (int i = 0; i < 3; ++i) localPos_[i] = localPos[i];
         paused_ = paused;
@@ -514,6 +518,14 @@ namespace kp
         if (!cfg_.on || !game_) return;
         if (worldLive_) VerifyAll();
         bool settled = worldLive_ && nowMs - worldSince_ >= (unsigned long long)cfg_.settleMs;
+        if (settled && sweepPending_)
+        {
+            // A save written while a body stood keeps it (run 5, M): its hand comes back after the load. Ours were
+            // verified above; anything else named like ours is a stray, even with nobody connected.
+            sweepPending_ = false;
+            ++sweeps_;
+            game_->RemoteSweep();
+        }
         int live = CountState(RB_LIVE) + CountState(RB_REMOVING);
         bool spawnedThisFrame = false;
         for (int i = 0; i < kMaxPlayers; ++i)

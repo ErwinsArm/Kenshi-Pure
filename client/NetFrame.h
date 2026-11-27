@@ -66,6 +66,8 @@ namespace kp
         virtual bool RemoteVerify(int /*slot*/) { return false; }
         virtual void RemoteFree(int /*slot*/) {}
         virtual void RemoteForgetAll() {}
+        // Once per world after it settled: destroy bodies named like ours that are not ours (a save kept them, G7).
+        virtual void RemoteSweep() {}
     };
 
     // Reads host, port and name from a KenshiPure.cfg text (key=value lines, '#' comments).
