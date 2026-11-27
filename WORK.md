@@ -1,6 +1,6 @@
 # WORK
 
-Goal: an own Kenshi multiplayer (own server + client mod) that works better than AnarchyKenshi and is fully under the user's control; everything is extracted from the client DLLs first (the original server is not available).
+Goal: an own Kenshi multiplayer (own server + client mod) that works better than AnarchyKenshi and is fully under the user's control, without depending on another mod (RE_Kenshi); everything is extracted from the client DLLs first (the original server is not available).
 
 - Route: own server and own client mod, AnarchyKenshi only a reference; plan in `docs/plan-first-playable.md`. M0 done (plugin loads via RE_Kenshi/KenshiLib, frame hook and game calls work in game). Next: M1 (read own position), after the G2 calling-convention sheet, now for the 1.0.65 exe through KenshiLib headers.
 - Live probe, second half untested in game: `health`, `inventory`, `find_items` and the write commands `heal`, `teleport`, `spawn_item` (`docs/client.md`). The user's Kenshi still has KenshiPure installed with `-ProbeWrite` and AnarchyKenshi off; after the test run `scripts/install-client.ps1 -GameDir "<Kenshi>" -Uninstall`. Open questions: `fleshStun` meaning (pick `heal` stun mode from healthy NPCs' values), `money` per faction or person, `knockoutTimer` stayed 0.

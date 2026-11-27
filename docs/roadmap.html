@@ -124,6 +124,7 @@ const DATA = {
     ]},
     {name:"Build: two players see each other walk", note:"The first playable version, in small steps. Each step is tested before the next one starts.", steps:[
       {tag:"M0", name:"Our mod starts in Kenshi", status:"done", d:"Tested by you: the mod loads, checks your game version (1.0.65), runs in every frame and reads values from the game without errors, also across a new game and a reload."},
+      {tag:"M0b", name:"Our own starter, no RE_Kenshi needed", status:"todo", d:"The mod starts by itself, early, on Steam's normal Kenshi (1.0.68) and on 1.0.65, with or without RE_Kenshi, like AnarchyKenshi. Also fixes the stretched full-screen picture. Plan reviewed by two critics (docs/plan-own-loader.md)."},
       {tag:"M1", name:"Read your own position", status:"now", d:"The mod knows where your character stands and where it walks."},
       {tag:"M2", name:"Our own small server", status:"todo", d:"A small program on your PC that passes positions between players, plus a test bot."},
       {tag:"M3", name:"Send and receive positions", status:"todo", d:"Your game and the server talk to each other while you play."},
@@ -145,7 +146,7 @@ const DATA = {
     {name:"Live game probe", d:"Claude can read your running game (status; your characters and everyone nearby with position, faction, health and knocked-out state; the mod log) during tests, only on your PC. Heal, teleport and item spawning are built but not yet tried in game."},
     {name:"Our mod KenshiPure", d:"Builds on your PC with one command, installs with one command, and switches AnarchyKenshi off and on again."},
     {name:"Message formats", d:"How the old mod's server and game talk, field by field."},
-    {name:"RE_Kenshi and KenshiLib", d:"Installed on your PC; a toolkit for building Kenshi mods."},
+    {name:"RE_Kenshi and KenshiLib", d:"Installed on your PC; a toolkit our mod still uses today. Goal: no longer needed after step M0b."},
     {name:"KenshiCoop", d:"Another co-op mod for your Kenshi version whose code we may reuse."},
     {name:"Knowledge map", d:"The colored tile map: how much we know about the old mod."}
   ]
