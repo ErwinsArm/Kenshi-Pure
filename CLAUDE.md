@@ -106,8 +106,8 @@ Every subagent and started session names `model` and `effort` (a hook checks).
   "user started your proposal" notice), else each report wakes the starter and re-reads its
   history. Stay linked only under ~200k and when you must act on its result; over that, run a
   foreground subagent instead. One `start_session` per message, never in parallel.
-- A handed-off job stays in its scope; anything outside it becomes a `WORK.md` line. Its
-  end-of-task upkeep is in scope (see "End of every task", step 2).
+- A handed-off job stays in its area: `.claude/`, `CLAUDE.md` and `scripts/` only if its brief
+  says so, else a `WORK.md` line. Notes, the knowledge map and the roadmap are every session's.
 - Past ~200k context (a hook warns), suggest a fresh session for new work, after the findings and
   `WORK.md` hold what it needs.
 - Subagents past 250k get a hand-over request, past 500k only git and the note (context guard).
@@ -117,8 +117,8 @@ Every subagent and started session names `model` and `effort` (a hook checks).
 The `critique` skill (critic-builder, critic-skeptic in parallel; quick and full are defined
 there). Run it: before a conclusion others will build on is written down as fact (both full); on a
 reimplementation or tooling plan (builder full, skeptic quick); on a `.claude/` or setup change
-(quick, full if it touches permissions, hooks or security); before anything is published; when the
-user asks. Not for small notes or fixes. Can't spawn them → ask the user to type `/critique`.
+(quick, full if it touches permissions, hooks or security); before anything is made public; when
+the user asks. Not for small notes, fixes or updates of the private knowledge map and roadmap. Can't spawn them → ask the user to type `/critique`.
 Runtime evidence outranks critics.
 
 ## Fixing problems
@@ -134,9 +134,8 @@ Runtime evidence outranks critics.
 2. Fix notes the work made false; when a finding changes what is known, update the tiles in
    `docs/knowledge-map.html`, its date line, and republish it to the artifact; when a step's state
    or the user's next action changes, update `docs/roadmap.html` (`DATA`, `updated`) and republish it; delete finished `WORK.md` entries; delete scratch files you made
-   (only yours: other sessions share this checkout). Whoever commits a finding does this step,
-   side sessions included. A subagent that doesn't commit skips it and returns its findings;
-   the caller does it for them. Upkeep left undone → one `WORK.md` line.
+   (only yours: other sessions share this checkout). A subagent that doesn't commit skips this
+   step; its caller does it.
 3. Commit by path in plain English without asking: `git commit -m "<msg>" -- <files>`, never a
    plain `git commit` (it takes what another session staged). Then pull the newest `main` and push, without asking.
 4. Edit this file only for rules every session needs; keep it under 200 lines.
