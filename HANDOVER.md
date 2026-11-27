@@ -35,10 +35,20 @@ State: M5 code committed as work in progress (builds, all 5 net tests pass incl.
 
 - Tests: `net/test/RemoteTest.cpp` (kp-remote-test, 63 checks: config, settle, spawn, drive with raised max speed, leave, stale, old pose, world change kept/forgotten with no call while no world, failed spawns, destroy that does not remove, death, KO, faulting commands, session end, range, body limit, steer AI skip, pause).
 
+- Test tooling: `scripts/run-game-test.ps1` has `-Cfg` (KenshiPure.cfg keys for one run, restored after; standin
+  lines dropped), `-Steps "at=<s> save|load SAVE NAME;..."` (client/AutoLoad.cpp runs them from the game window's
+  messages), `-BotSeconds`, `-BotRestart`, `-SaveCopy` (loads "KP TEST <save>", deleted after). Stray-body sweep: before each
+  spawn, characters named "[KP] ..." that are not ours get destroyed and logged as STRAY (G7 detector + fallback).
+- Version 0.0.6-m5 (plugin and core; the core version is no longer a CMake cache entry). Installed with install-client.ps1.
+
+## In-game runs (log what each showed here)
+- Run 1 (order drive, join / walk / bot leaves at 130 s / rejoins at 170 s): running.
+
 ## Next steps (in order)
-1. Test tooling: `scripts/run-game-test.ps1` -BotSeconds / -BotRestart; autoload steps `at=<s> load|save <name>`.
-2. In-game runs (Kenshi closed first; G7 on a copy of "MP TEST", never on it).
-3. Notes: docs/client.md M5 section, plan, remote-bodies.md, roadmap DATA, knowledge map, WORK.md; commit, pull, push.
+1. Finish the in-game runs: run 1 above; steer vs order (`-Cfg "remote_drive=steer"`); a load in the world
+   (`-Steps "at=80 load SAVE NAME"`); G7 with `-SaveCopy -Cfg "remote_save_guard=0" -Steps "at=60 save SAVE NAME;at=90 load SAVE NAME"`
+   (expect STRAY lines if saves keep bodies) and the same with the guard on (expect none).
+2. Notes: docs/client.md M5 section, plan, remote-bodies.md, roadmap DATA, knowledge map, WORK.md; commit, pull, push.
 
 ## Design and new static facts
 

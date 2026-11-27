@@ -17,4 +17,6 @@ namespace kp
     bool RemoteGameVerify(int slot);
     void RemoteGameFree(int slot);
     void RemoteGameForgetAll();
+    // Destroys characters named "[KP] ..." that are not ours (a save kept them); returns how many. Logged.
+    int RemoteGameSweep();
 }

@@ -226,6 +226,44 @@ namespace
         }
     }
 
+    // Characters in the update list (POD copy).
+    unsigned int CopyUpdateList(GameWorld* gw, Character** out, unsigned int max)
+    {
+        __try
+        {
+            unsigned int n = 0;
+            const ogre_unordered_set<Character*>::type& set = gw->getCharacterUpdateList();
+            for (ogre_unordered_set<Character*>::type::const_iterator it = set.begin(); it != set.end() && n < max; ++it) out[n++] = *it;
+            return n;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return 0;
+        }
+    }
+
+    // 1: a "[KP] " body that is not a player character; 0 no; -1 fault.
+    int IsStray(Character* c, char* name, size_t nameSize)
+    {
+        __try
+        {
+            if (!c || c->isPlayerCharacter()) return 0;
+            CopyName(c, name, nameSize);
+            return strncmp(name, kNamePrefix, sizeof(kNamePrefix) - 1) == 0 ? 1 : 0;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return -1;
+        }
+    }
+
+    bool OwnBody(Character* c)
+    {
+        for (int i = 0; i < KP_SKIP_REMOTE; ++i)
+            if (g_slots[i].used && Resolve(i) == c) return true;
+        return false;
+    }
+
     typedef void (*ProcessKillListFn)(GameWorld*, bool);   // GameWorld::processKillList is protected in KenshiLib's header
     bool ProcessKillListNow()
     {
@@ -299,7 +337,7 @@ namespace kp
             KPS_AbstractMovementBase__setDesiredSpeed, KPS_AbstractMovementBase__setDesiredSpeedOrders,
             KPS_CharMovement__setDirectMovement, KPS_CharMovement__setPositionDirectionAndTeleport,
             KPS_CharMovement__setPositionSimple, KPS_Character__teleportVisuallyOnly, KPS_CharMovement__halt,
-            KPS_AI__periodicUpdate,
+            KPS_AI__periodicUpdate, KPS_GameWorld__getCharacterUpdateList,
         };
         for (size_t i = 0; i < sizeof(need) / sizeof(need[0]); ++i)
             if (!SiteOk(need[i]))
@@ -331,6 +369,25 @@ namespace kp
         return true;
     }
 
+    int RemoteGameSweep()
+    {
+        GameWorld* gw = GameWorldGlobal();
+        static Character* all[2048];
+        unsigned int n = gw ? CopyUpdateList(gw, all, 2048) : 0;
+        int found = 0;
+        for (unsigned int i = 0; i < n; ++i)
+        {
+            char name[64] = "";
+            if (IsStray(all[i], name, sizeof(name)) != 1 || OwnBody(all[i])) continue;
+            ++found;
+            bool ret = false;
+            int r = DestroyCalls(all[i], "KenshiPure: stray remote body", &ret);
+            Log("remote: STRAY body \"%s\" in the world (not one of ours: a save kept it?) - destroy %s", name,
+                r == 1 ? "asked" : "faulted");
+        }
+        return found;
+    }
+
     bool RemoteGameSpawn(const RemoteConfig& cfg, const char* playerName, const float* pos, float yaw, RemoteSpawnInfo* out)
     {
         int slot = -1;
@@ -339,6 +396,7 @@ namespace kp
         if (slot < 0) { Log("remote: no free body slot"); return false; }
         GameWorld* gw = GameWorldGlobal();
         if (!gw) return false;
+        RemoteGameSweep();   // a body a save kept (G7) carries our prefix: remove it before building a new one
         Slot& s = g_slots[slot];
         memset(&s, 0, sizeof(s));
         _snprintf_s(s.name, sizeof(s.name), _TRUNCATE, "%s%s", kNamePrefix, playerName && playerName[0] ? playerName : "?");

@@ -21,7 +21,7 @@
 #include "AutoLoad.h"
 #include "Cheat.h"
 
-#define KP_VERSION "0.0.5-m4"
+#define KP_VERSION "0.0.6-m5"
 
 namespace
 {

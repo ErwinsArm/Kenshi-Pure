@@ -11,4 +11,7 @@ namespace kp
     void AutoLoadInit();
     // Each frame: once the main menu has been up for a few seconds, asks the game to load the save.
     void AutoLoadOnFrame(GameWorld* gw);
+    // From the game window's messages: the later steps of autoload.txt ("at=<s> load|save <save>", seconds
+    // after the first world was entered), one per message.
+    void AutoLoadSteps(GameWorld* gw);
 }

@@ -13,6 +13,43 @@ namespace
 {
     char g_save[256] = "";
     bool g_pending = false;
+
+    // Later steps of a test run (lines after the first in autoload.txt): "at=<s> load <save>" or
+    // "at=<s> save <save>", seconds after the first world was entered. Run from the game window's
+    // messages (the main thread, outside the frame hook), like the first load.
+    struct Step { unsigned int atMs; int kind; char name[128]; bool done; };   // kind 1 load, 2 save
+    Step g_steps[16];
+    int g_stepCount = 0;
+    unsigned long long g_worldSince = 0;
+
+    __declspec(noinline) void CallSave(SaveManager* sm, const char* name)
+    {
+        std::string s(name);
+        sm->save(s, false);   // asks for a save; SaveManager::execute writes it later (1.0.65 0x47b0fe, M)
+    }
+
+    // 1 asked, 0 no save manager yet, -1 faulted.
+    int TrySave(const char* name)
+    {
+        __try
+        {
+            SaveManager* sm = SaveManager::getSingleton();
+            if (!sm) return 0;
+            CallSave(sm, name);
+            return 1;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return -1;
+        }
+    }
+
+    bool StepsLeft()
+    {
+        for (int i = 0; i < g_stepCount; ++i)
+            if (!g_steps[i].done) return true;
+        return false;
+    }
     unsigned long long g_menuSince = 0;
     const unsigned long long kMenuWaitMs = 5000;   // let the main menu finish building first
 
@@ -90,6 +127,7 @@ namespace
         if (msg == kMsgAutoLoad)
         {
             kp::AutoLoadOnFrame(kp::GameWorldGlobal());
+            kp::AutoLoadSteps(kp::GameWorldGlobal());
             return 0;
         }
         return CallWindowProcW(g_origProc, w, msg, wp, lp);
@@ -99,7 +137,7 @@ namespace
     {
         bool pressed = false;
         HWND game = NULL;
-        for (int i = 0; i < 3000 && g_pending; ++i)   // at most ~5 minutes
+        for (int i = 0; i < 18000 && (g_pending || StepsLeft()); ++i)   // at most ~30 minutes
         {
             Sleep(100);
             if (!pressed)
@@ -161,11 +199,38 @@ namespace kp
         _snwprintf_s(path, MAX_PATH, _TRUNCATE, L"%sautoload.txt", PluginDir());
         FILE* f = NULL;
         if (_wfopen_s(&f, path, L"rb") != 0 || !f) return;
-        size_t n = fread(g_save, 1, sizeof(g_save) - 1, f);
+        static char text[4096];
+        size_t n = fread(text, 1, sizeof(text) - 1, f);
         fclose(f);
-        g_save[n] = 0;
-        while (n > 0 && (g_save[n - 1] == '\r' || g_save[n - 1] == '\n' || g_save[n - 1] == ' ')) g_save[--n] = 0;
+        text[n] = 0;
         DeleteFileW(path);   // one shot: the next normal start must not load anything
+        // First line: the save to load at the main menu; then optional steps (see Step).
+        char* line = text;
+        for (int ln = 0; line && *line; ++ln)
+        {
+            char* end = strchr(line, '\n');
+            if (end) *end = 0;
+            size_t len = strlen(line);
+            while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == ' ')) line[--len] = 0;
+            if (ln == 0) strcpy_s(g_save, sizeof(g_save), line);
+            else if (len > 0 && g_stepCount < 16)
+            {
+                unsigned int at = 0;
+                char kind[8] = "", name[128] = "";
+                if (sscanf_s(line, "at=%u %7s %127[^\n]", &at, kind, (unsigned)sizeof(kind), name, (unsigned)sizeof(name)) == 3 &&
+                    (strcmp(kind, "load") == 0 || strcmp(kind, "save") == 0))
+                {
+                    Step& s = g_steps[g_stepCount++];
+                    s.atMs = at * 1000;
+                    s.kind = strcmp(kind, "load") == 0 ? 1 : 2;
+                    strcpy_s(s.name, sizeof(s.name), name);
+                    s.done = false;
+                }
+                else
+                    Log("autoload: step line not understood: %s", line);
+            }
+            line = end ? end + 1 : NULL;
+        }
         if (!g_save[0]) return;
         if (!SiteOk(KPS_SaveManager__getSingleton) || !SiteOk(KPS_SaveManager__load_name_))
         {
@@ -173,7 +238,8 @@ namespace kp
             return;
         }
         g_pending = true;
-        Log("autoload: will load save \"%s\" at the main menu", g_save);
+        if (g_stepCount > 0 && !SiteOk(KPS_SaveManager__save)) Log("autoload: save steps off (SaveManager::save unresolved)");
+        Log("autoload: will load save \"%s\" at the main menu, then %d step%s", g_save, g_stepCount, g_stepCount == 1 ? "" : "s");
         HANDLE t = CreateThread(NULL, 0, AutoLoadThread, NULL, 0, NULL);
         if (t) CloseHandle(t);
     }
@@ -193,5 +259,27 @@ namespace kp
         g_pending = false;
         int r = TryLoad(g_save);
         Log("autoload: load \"%s\" %s", g_save, r == 1 ? "asked" : (r == 0 ? "skipped (no save manager)" : "FAULTED"));
+    }
+
+    void AutoLoadSteps(GameWorld* gw)
+    {
+        if (g_pending || g_stepCount == 0) return;
+        unsigned long long now = GetTickCount64();
+        if (g_worldSince == 0)
+        {
+            if (!InWorld(gw)) return;
+            g_worldSince = now;
+            Log("autoload: in a world; %d step%s follow", g_stepCount, g_stepCount == 1 ? "" : "s");
+        }
+        for (int i = 0; i < g_stepCount; ++i)
+        {
+            Step& s = g_steps[i];
+            if (s.done || now - g_worldSince < s.atMs) continue;
+            s.done = true;
+            int r = s.kind == 1 ? TryLoad(s.name) : (SiteOk(KPS_SaveManager__save) ? TrySave(s.name) : -2);
+            Log("autoload: step at %u s: %s \"%s\" %s", s.atMs / 1000, s.kind == 1 ? "load" : "save", s.name,
+                r == 1 ? "asked" : (r == 0 ? "skipped (no save manager)" : (r == -2 ? "skipped (row unresolved)" : "FAULTED")));
+            break;   // one step per message
+        }
     }
 }
