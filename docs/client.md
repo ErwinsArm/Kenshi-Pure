@@ -270,6 +270,96 @@ when `mods\KenshiPure\KenshiPure.cfg` holds `probe_write=1` (written by `install
 removed by a plain install or `-Uninstall`). Port bound to loopback; other programs on the same PC can
 still connect (no authentication), so keep writes off when not testing.
 
+# Client: cheat window (the user's testing tool)
+
+Separate, optional `KenshiPureCheats.dll` (sources `client/cheats/`; host side `client/CheatHost.cpp`,
+interface `client/CheatApi.h`). Installed only with `install-client.ps1 -Cheats` (a plain install removes
+it); without the file KenshiPure logs `cheat: not installed` and nothing changes. Built and compile-checked;
+**not yet run in game**.
+
+- KenshiPure loads the DLL in `kpStart` if it is next to it, calls `kpCheatStart` (exe path and hash) and
+  `kpCheatFrame` from its frame listener. The DLL resolves its own copy of the address table (same
+  `sites.tsv`; known builds only), installs no hooks and logs to `KenshiPureCheats.log`.
+- Window: drawn with Kenshi's own GUI library MyGUI 3.2.3 (the game's `MyGUIEngine_x64.dll`, SHA-256
+  `fea6f1f935703812485bd6606ff4d3ceea172ece131ed4c6dcbf7a7e25b083a8`), so it shows inside the game like
+  Kenshi's own windows, also in full screen. Headers and import library from KenshiLib 0.5.0 (declarations
+  only); the build checks that all 37 MyGUI symbols the DLL imports are exported by the game's DLL. That
+  KenshiLib's MyGUI headers match the game's build in class layout is **I** (a critic found export-name
+  differences elsewhere in the library).
+- Templates and layer from Kenshi's own layouts (`data/gui`): `Kenshi_WindowCX`, `Kenshi_Button1`,
+  `Kenshi_TextboxStandardText`, `Kenshi_ComboBox`, `Kenshi_EditBox`, `Kenshi_WordWrap`, layer `Window`.
+  Created once MyGUI, the layer and all six names exist; every MyGUI call runs in `__try` and a failure
+  switches the window off for the run (logged).
+- Content: the selected character's name; buttons Heal, Damage, Knock out, Teleport to camera; an item box
+  (list Bread, Katana, Samurai Armour or the `cheat_item=` lines of an optional `KenshiPure-cheats.cfg`;
+  any name or string ID can be typed), an amount box (1–100) and Create item; the last result. Close
+  button hides the window, Ctrl+Shift+C shows/hides it. Clicks only queue the action; the frame listener
+  runs it on the game thread.
+- Actions (`client/cheats/CheatActions.cpp`), on the selected own character:
+
+| Button | Action |
+|---|---|
+| Heal | every part to max health, stun damage 0, blood to `getMaxBlood`, bleed rate 0 (the probe's measured full heal), knockout timer 0 |
+| Damage | each non-robotic part loses 30 % of its max health, never below -50 % (margin to death: **I**) |
+| Knock out | torso and head parts get stun damage so their health reads -20 % (stun recovers), and `MedicalSystem::knockoutTimer` is raised to 20 |
+| Teleport to camera | `Character::teleport` to `GameWorld::getCameraCenter` (that it is the look-at point, not the eye: **I**; the log shows both) |
+| Create item | the typed item, N single adds (inventory full → on the ground) |
+
+- Knock out (**M**, 1.0.65 disassembly): `MedicalSystem::reassessCollapseMode` (0x648890) sets
+  `unconcious` (`+0x161`) when `knockoutTimer` (`+0xA0`) is above a threshold, among other triggers
+  (blood, a part's collapse stage, hunger). It runs from the periodic medical update, not every frame, so
+  the fall may come a moment later; the timer's unit is not measured.
+- Not checked yet (needs a run): whether clicks on the window also reach the game world, text fitting at
+  other UI scales, whether Ctrl+Shift+C does something in Kenshi too.
+- Single-player only by intent: nothing stops it in a multiplayer session yet (needed before M3 is used with
+  others).
+
+## The probe's three bugs: causes and fixes
+
+Read in RE_Kenshi's 1.0.65 exe (`Kenshi_x64.exe`, SHA-256 `504b362cde850d56afb1cea6f5b7b0ee014d9dd7b47e188599d91c804502cd3e`;
+iced-x86 disassembly; RVAs, image base 0x140000000). In 1.0.68 only the rows we call are proven (the proof
+rules above); their callees (`tryAddItem`, the section's `addItem`, ...) were not compared.
+
+1. **Weapons: the factory returned nothing.** `RootObjectFactory::createItem(gd, hand, weaponMesh, matData,
+   level, faction)` (0x57fcc0) reads the GameData type (`gd+0x50`) and returns 0 at once for type 2
+   (`WEAPON`) and a few others (`cmp eax,2; je` → `xor eax,eax`, **M**). Weapons are built in its branch for type 0x33
+   (`WEAPON_MANUFACTURER`): gd = maker, third argument = the weapon (null → one picked from the maker's
+   "weapon types" list), null material → picked from the maker's "material" list; with no level found it
+   falls back to maker `1057-gamedata.base` and material `1058-gamedata.base` (so `cheat_weapon_maker`
+   is then ignored), then allocates 0x258 bytes and builds the weapon (**M**). Fix: `createItem(maker, hand(), weaponData, NULL, -1, NULL)`. That the
+   third argument takes the weapon's own GameData (KenshiLib calls it `weaponMesh`) is **I**: the log names
+   the item made.
+2. **Amount > 1 left extra single items.** `Inventory::addItem(item, q, drop, destroy)` (0x745140) calls
+   `tryAddItem(item, q)` (0x74b1e0), which tries each section's `InventorySection::addItem` (0x74bd70) and
+   passes q = 1 to the sections after one fails. A section's addItem sets q = q + item quantity - 1 and the
+   item's quantity (`+0x12C`) to 1, merges into matching stacks, then, while q is above the stack limit,
+   places copies (`RootObjectFactory::copyItem`) one by one; when a later placement finds no space it
+   returns false and does not take the placed copies back (**M**). After a failed `tryAddItem`,
+   `addItem`'s own drop path drops the item and, for an item that does not stack, copies (`copyItem`) and
+   drops more per its quantity (**M**). Which of these made the probe's 5 + 4 is **I**. Fix: an amount N is
+   N single creates and `addItem(item, 1, true, false)` calls: q = 1 never copies in the section code; the
+   log gives the item's quantity right after `createItem` (1 expected, **I**) and the stack merge is
+   expected to join them (**I**).
+3. **Teleport lost while paused.** The probe called only `CharMovement::_setPositionAndTeleport(pos, 0)`
+   (0x65deb0). The game's `Character::teleport(const Vector3&)` (0x5c9bf0) also writes the character's own
+   position (`this+0x48`), calls the movement's `_setPositionAndTeleport(pos, -1)` (vtable +0xB8 of
+   `this+0x640`; floor -1 leaves `+0x334` unchanged, 0 set it to 9) and, unless a thread runs
+   (`ThreadClass::isRunning`), `AnimationClass::setPosition` on `this+0x448` (**M**). Which difference lost
+   the move is **I**. Fix: `Character::teleport`. Check (log only): the position right after the teleport
+   and again after 1 s of running game, with the distance to the target.
+
+## Test steps for the user (after M3, with the game free)
+
+1. Claude installs the new build with the cheats (`install-client.ps1 -Cheats`); nothing to type.
+2. Start Kenshi and load a save. The "KenshiPure cheats" window appears; select one of your characters
+   (its name shows in the window).
+3. Press each button once, also once while paused: Damage three or four times (health bars drop, the
+   character may fall over), Heal (healthy again), Knock out (falls unconscious, wakes later by itself),
+   Create item with Bread and amount 5 (one stack of 5 in the bag), then Katana, then Samurai Armour;
+   move the camera away and press Teleport to camera (once more while paused, then unpause).
+4. Tell Claude what you saw: does the window look right, did a click also move your character, did
+   anything go wrong. Claude reads `KenshiPureCheats.log`.
+
 # Client plugin: display fix
 
 Source: `client/Display.cpp`. Kenshi can start full screen in a smaller, stretched mode until Alt+Enter

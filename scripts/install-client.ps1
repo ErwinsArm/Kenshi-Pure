@@ -8,11 +8,12 @@
 # KenshiPure starts as an Ogre plugin (KenshiPureLoader.dll), with or without RE_Kenshi.
 # What it touches, and nothing else:
 #   <game>\mods\KenshiPure\        KenshiPureLoader.dll, KenshiPure.dll (+ .pdb), KenshiPureCore.dll (the
-#                                  network core, from scripts\build-net.ps1), and KenshiPure.cfg: the
+#                                  network core, from scriptsuild-net.ps1), and KenshiPure.cfg: the
 #                                  network lines host=127.0.0.1, port=27850, name=player are added when
 #                                  missing (lines already there, e.g. another server, are kept);
 #                                  probe_write=1 is there only with -ProbeWrite (the live game probe may
-#                                  heal, teleport and spawn items)
+#                                  heal, teleport and spawn items); KenshiPureCheats.dll (+ .pdb, the
+#                                  cheat window) only with -Cheats, else removed
 #   <game>\Plugins_x64.cfg         adds / removes "Plugin=mods/KenshiPure/KenshiPureLoader" (right after
 #                                  "Plugin=RE_Kenshi" if that is there, else before the first Plugin= line);
 #                                  removes / restores AnarchyKenshi's "Plugin=mods/AnarchyKenshi/AnarchyLoader";
@@ -25,6 +26,7 @@ param(
     [Parameter(Mandatory = $true)][string]$GameDir,
     [switch]$Uninstall,
     [switch]$ProbeWrite,  # allow the probe's write commands (heal, teleport, spawn_item)
+    [switch]$Cheats,      # also install KenshiPureCheats.dll (the cheat window); without it, it is removed
     [string]$BuildDir = "",
     [string]$CoreDir = "",   # where KenshiPureCore.dll is (default build\net\Release)
     [switch]$NoGameCheck  # for tests only: skip the "Kenshi is running" check
@@ -48,7 +50,7 @@ $Dlls        = @("KenshiPureLoader.dll", "KenshiPure.dll")
 # Files of this and older KenshiPure installs (RE_Kenshi.json and KenshiPure.mod: the RE_Kenshi start).
 $CoreDll     = "KenshiPureCore.dll"
 $OurFiles    = @("KenshiPureLoader.dll", "KenshiPureLoader.pdb", "KenshiPure.dll", "KenshiPure.pdb", $CoreDll, "KenshiPure.mod",
-                 "RE_Kenshi.json", "KenshiPure.cfg", "install-state.json")
+                 "RE_Kenshi.json", "KenshiPure.cfg", "install-state.json", "KenshiPureCheats.dll", "KenshiPureCheats.pdb")
 
 foreach ($f in @($pluginsCfg, $modsCfg)) {
     if (-not (Test-Path -LiteralPath $f)) { throw "Not a Kenshi folder (missing $f): $GameDir" }
@@ -89,6 +91,11 @@ if (-not $Uninstall) {
         if (Test-Path -LiteralPath $pdb) { Copy-Item -LiteralPath $pdb -Destination $modDir -Force }
     }
     Copy-Item -LiteralPath (Join-Path $CoreDir $CoreDll) -Destination (Join-Path $modDir $CoreDll) -Force
+    foreach ($c in @("KenshiPureCheats.dll", "KenshiPureCheats.pdb")) {
+        $p = Join-Path $modDir $c
+        if ($Cheats) { Copy-Item -LiteralPath (Join-Path $BuildDir $c) -Destination $p -Force }
+        elseif (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
+    }
     foreach ($old in @("RE_Kenshi.json", "KenshiPure.mod")) {
         $p = Join-Path $modDir $old
         if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }

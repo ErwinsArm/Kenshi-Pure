@@ -9,7 +9,7 @@
 // A line whose access is not a game field (an own struct or an Ogre type that shares the name) ends
 // with `// kp-not-game: <why>`.
 //
-//   node scripts/check-fields.mjs [files...]      (default: client/*.cpp client/*.h)
+//   node scripts/check-fields.mjs [files...]      (default: client/ and client/cheats/ *.cpp *.h)
 import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -81,7 +81,8 @@ export function check(text, { names, classes }) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = process.argv.slice(2).length ? process.argv.slice(2)
-    : readdirSync(join(REPO, "client")).filter((f) => /\.(cpp|h)$/.test(f)).map((f) => join(REPO, "client", f));
+    : ["client", join("client", "cheats")].flatMap((d) =>
+        readdirSync(join(REPO, d)).filter((f) => /\.(cpp|h)$/.test(f)).map((f) => join(REPO, d, f)));
   const members = gameMembers();
   let bad = 0;
   for (const f of files) {
