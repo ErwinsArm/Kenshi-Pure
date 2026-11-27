@@ -76,6 +76,16 @@ if ($LASTEXITCODE -ne 0) { throw "ml64 failed ($LASTEXITCODE)" }
 $dll = Join-Path $out "KenshiPure.dll"
 Invoke-Link $dll ($clientObjs + $mhObjs + $thunks) @("bcrypt.lib", "user32.lib", "ws2_32.lib") @("/DLL")
 
+# The optional cheats DLL: client\cheats\ plus its own copy of the address layer. MyGUI is the game's
+# own MyGUIEngine_x64.dll, linked through KenshiLib's import library (declarations only).
+$myguiInc = Join-Path $Tc.KenshiLibSrc "Include\mygui"
+$myguiLib = Join-Path $Tc.KenshiLibSrc "Libraries\mygui\MyGUIEngine_x64.lib"
+$cheatSrc = @(Get-ChildItem -LiteralPath (Join-Path $src "cheats") -Filter *.cpp | ForEach-Object { $_.FullName }) +
+            @((Join-Path $src "Sites.cpp"), (Join-Path $src "Log.cpp"), (Join-Path $gen "kp_sites_gen.cpp"))
+$cheatObjs = Invoke-Compile "cheats" $cheatSrc @("/EHa", "/wd4482", "/wd4251", "/wd4275", "/I$myguiInc")
+$cheatDll = Join-Path $out "KenshiPureCheats.dll"
+Invoke-Link $cheatDll ($cheatObjs + $thunks) @("user32.lib", $myguiLib) @("/DLL")
+
 # The loader: its own files plus the client's log and kenshi.cfg reader.
 $loaderDir = Join-Path $RepoRoot "loader"
 $loaderSrc = @(Get-ChildItem -LiteralPath $loaderDir -Filter *.cpp | ForEach-Object { $_.FullName }) +
@@ -100,7 +110,7 @@ if ($LASTEXITCODE -ne 0) { Stop-ToolchainHelpers; throw "pose-math-test failed" 
 # 4. Checks on the results.
 function Get-Dump([string]$file, [string]$what) { return (& $Tc.Dumpbin /nologo $what $file) -join "`n" }
 $problems = @()
-foreach ($f in @($dll, $loader)) {
+foreach ($f in @($dll, $loader, $cheatDll)) {
     $imports = Get-Dump $f "/imports"
     $n = Split-Path $f -Leaf
     if ($imports -notmatch "MSVCR100\.dll") { $problems += "$n does not import MSVCR100.dll (wrong CRT)" }
@@ -110,6 +120,23 @@ foreach ($f in @($dll, $loader)) {
 $exp = Get-Dump $dll "/exports"
 if ($exp -notmatch "\bkpStart\b") { $problems += "KenshiPure.dll does not export kpStart" }
 if ($exp -match "startPlugin") { $problems += "KenshiPure.dll still exports RE_Kenshi's startPlugin" }
+$cexp = Get-Dump $cheatDll "/exports"
+foreach ($e in @("kpCheatStart", "kpCheatFrame")) { if ($cexp -notmatch "\b$e\b") { $problems += "KenshiPureCheats.dll does not export $e" } }
+# Every MyGUI symbol the cheats DLL imports must be exported by the game's own MyGUIEngine_x64.dll.
+$gameMygui = Join-Path $GameDir "MyGUIEngine_x64.dll"
+if (Test-Path -LiteralPath $gameMygui) {
+    $have = @{}
+    foreach ($l in (& $Tc.Dumpbin /nologo /exports $gameMygui)) { if ($l -match "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)") { $have[$Matches[1]] = 1 } }
+    $want = @(); $inMygui = $false
+    foreach ($l in (& $Tc.Dumpbin /nologo /imports $cheatDll)) {
+        if ($l -match "^\s+(\S+\.dll)\s*$") { $inMygui = $Matches[1] -ieq "MyGUIEngine_x64.dll"; continue }
+        if ($inMygui -and $l -match "^\s+[0-9A-F]+\s+(\S+)\s*$") { $want += $Matches[1] }
+    }
+    $missing = @($want | Where-Object { -not $have.ContainsKey($_) })
+    if ($want.Count -eq 0) { $problems += "KenshiPureCheats.dll: no MyGUI imports found (check the dumpbin parsing)" }
+    elseif ($missing.Count) { $problems += "KenshiPureCheats.dll imports MyGUI symbols the game's MyGUIEngine_x64.dll lacks: $($missing -join ', ')" }
+    else { Write-Host "MyGUI imports: all $($want.Count) found in the game's MyGUIEngine_x64.dll" }
+} else { Write-Host "MyGUI import check skipped: $gameMygui not found" }
 $lexp = Get-Dump $loader "/exports"
 foreach ($e in @("dllStartPlugin", "dllStopPlugin")) { if ($lexp -notmatch "\b$e\b") { $problems += "KenshiPureLoader.dll does not export $e" } }
 Stop-ToolchainHelpers  # link and dumpbin leave mspdbsrv.exe running
@@ -123,7 +150,7 @@ if ((Test-Path -LiteralPath $e65) -and (Test-Path -LiteralPath $e68)) {
     if ($LASTEXITCODE -ne 0) { throw "sites-test failed: the run-time resolver disagrees with sites.tsv" }
 } else { Write-Host "sites-test skipped: Kenshi exes not found in $GameDir" }
 
-foreach ($f in @($dll, $loader)) {
+foreach ($f in @($dll, $loader, $cheatDll)) {
     Write-Host "Built $f"
     Write-Host "  sha256 $((Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLower())"
 }

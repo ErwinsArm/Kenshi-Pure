@@ -9,7 +9,8 @@
 # What it touches, and nothing else:
 #   <game>\mods\KenshiPure\        KenshiPureLoader.dll, KenshiPure.dll (+ .pdb), and KenshiPure.cfg:
 #                                  with -ProbeWrite it holds probe_write=1 (the live game probe may heal,
-#                                  teleport and spawn items); without it, no cfg
+#                                  teleport and spawn items); without it, no cfg; KenshiPureCheats.dll
+#                                  (+ .pdb, the cheat window) only with -Cheats, else removed
 #   <game>\Plugins_x64.cfg         adds / removes "Plugin=mods/KenshiPure/KenshiPureLoader" (right after
 #                                  "Plugin=RE_Kenshi" if that is there, else before the first Plugin= line);
 #                                  removes / restores AnarchyKenshi's "Plugin=mods/AnarchyKenshi/AnarchyLoader";
@@ -22,6 +23,7 @@ param(
     [Parameter(Mandatory = $true)][string]$GameDir,
     [switch]$Uninstall,
     [switch]$ProbeWrite,  # allow the probe's write commands (heal, teleport, spawn_item)
+    [switch]$Cheats,      # also install KenshiPureCheats.dll (the cheat window); without it, it is removed
     [string]$BuildDir = "",
     [switch]$NoGameCheck  # for tests only: skip the "Kenshi is running" check
 )
@@ -42,7 +44,7 @@ $stateFile   = Join-Path $modDir "install-state.json"
 $Dlls        = @("KenshiPureLoader.dll", "KenshiPure.dll")
 # Files of this and older KenshiPure installs (RE_Kenshi.json and KenshiPure.mod: the RE_Kenshi start).
 $OurFiles    = @("KenshiPureLoader.dll", "KenshiPureLoader.pdb", "KenshiPure.dll", "KenshiPure.pdb", "KenshiPure.mod",
-                 "RE_Kenshi.json", "KenshiPure.cfg", "install-state.json")
+                 "RE_Kenshi.json", "KenshiPure.cfg", "install-state.json", "KenshiPureCheats.dll", "KenshiPureCheats.pdb")
 
 foreach ($f in @($pluginsCfg, $modsCfg)) {
     if (-not (Test-Path -LiteralPath $f)) { throw "Not a Kenshi folder (missing $f): $GameDir" }
@@ -80,6 +82,11 @@ if (-not $Uninstall) {
         Copy-Item -LiteralPath (Join-Path $BuildDir $d) -Destination (Join-Path $modDir $d) -Force
         $pdb = [IO.Path]::ChangeExtension((Join-Path $BuildDir $d), ".pdb")
         if (Test-Path -LiteralPath $pdb) { Copy-Item -LiteralPath $pdb -Destination $modDir -Force }
+    }
+    foreach ($c in @("KenshiPureCheats.dll", "KenshiPureCheats.pdb")) {
+        $p = Join-Path $modDir $c
+        if ($Cheats) { Copy-Item -LiteralPath (Join-Path $BuildDir $c) -Destination $p -Force }
+        elseif (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
     }
     foreach ($old in @("RE_Kenshi.json", "KenshiPure.mod")) {
         $p = Join-Path $modDir $old

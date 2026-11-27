@@ -194,39 +194,47 @@ when `mods\KenshiPure\KenshiPure.cfg` holds `probe_write=1` (written by `install
 removed by a plain install or `-Uninstall`). Port bound to loopback; other programs on the same PC can
 still connect (no authentication), so keep writes off when not testing.
 
-# Client: cheat hotkeys (the user's testing tool)
+# Client: cheat window (the user's testing tool)
 
-Source: `client/Cheat.cpp`, `client/Cheat.h`; hooked in `client/KenshiPure.cpp` (`CheatInit`, `CheatOnFrame`
-in the frame listener). Built and compile-checked; **not yet run in game**. Addresses: existing probe rows plus
-`Character::teleport` (feature `optional:cheat-write`, proven in 1.0.65 0x5c9bf0 and 1.0.68 0x5ca680, shift
-0xa90 like its 8 neighbours).
+Separate, optional `KenshiPureCheats.dll` (sources `client/cheats/`; host side `client/CheatHost.cpp`,
+interface `client/CheatApi.h`). Installed only with `install-client.ps1 -Cheats` (a plain install removes
+it); without the file KenshiPure logs `cheat: not installed` and nothing changes. Built and compile-checked;
+**not yet run in game**.
 
-- Hotkeys, not a drawn window: read with `GetAsyncKeyState` on the game thread after each frame, so they do
-  not depend on Kenshi's renderer or GUI and work in full screen, windowed and while paused. Only while the
-  game window is in front, Ctrl+Shift held and Alt not held (AltGr is Ctrl+Alt). Feedback: Windows' "OK"
-  sound on success, its error sound on failure, and a `cheat: ...` line in `KenshiPure.log`.
-- Target: the player's selected character, only if it is one of `playerCharacters`.
+- KenshiPure loads the DLL in `kpStart` if it is next to it, calls `kpCheatStart` (exe path and hash) and
+  `kpCheatFrame` from its frame listener. The DLL resolves its own copy of the address table (same
+  `sites.tsv`; known builds only), installs no hooks and logs to `KenshiPureCheats.log`.
+- Window: drawn with Kenshi's own GUI library MyGUI 3.2.3 (the game's `MyGUIEngine_x64.dll`, SHA-256
+  `fea6f1f935703812485bd6606ff4d3ceea172ece131ed4c6dcbf7a7e25b083a8`), so it shows inside the game like
+  Kenshi's own windows, also in full screen. Headers and import library from KenshiLib 0.5.0 (declarations
+  only); the build checks that all 37 MyGUI symbols the DLL imports are exported by the game's DLL. That
+  KenshiLib's MyGUI headers match the game's build in class layout is **I** (a critic found export-name
+  differences elsewhere in the library).
+- Templates and layer from Kenshi's own layouts (`data/gui`): `Kenshi_WindowCX`, `Kenshi_Button1`,
+  `Kenshi_TextboxStandardText`, `Kenshi_ComboBox`, `Kenshi_EditBox`, `Kenshi_WordWrap`, layer `Window`.
+  Created once MyGUI, the layer and all six names exist; every MyGUI call runs in `__try` and a failure
+  switches the window off for the run (logged).
+- Content: the selected character's name; buttons Heal, Damage, Knock out, Teleport to camera; an item box
+  (list Bread, Katana, Samurai Armour or the `cheat_item=` lines of an optional `KenshiPure-cheats.cfg`;
+  any name or string ID can be typed), an amount box (1–100) and Create item; the last result. Close
+  button hides the window, Ctrl+Shift+C shows/hides it. Clicks only queue the action; the frame listener
+  runs it on the game thread.
+- Actions (`client/cheats/CheatActions.cpp`), on the selected own character:
+
+| Button | Action |
+|---|---|
+| Heal | every part to max health, stun damage 0, blood to `getMaxBlood`, bleed rate 0 (the probe's measured full heal), knockout timer 0 |
+| Damage | each non-robotic part loses 30 % of its max health, never below -50 % (margin to death: **I**) |
+| Knock out | torso and head parts get stun damage so their health reads -20 % (stun recovers), and `MedicalSystem::knockoutTimer` is raised to 20 |
+| Teleport to camera | `Character::teleport` to `GameWorld::getCameraCenter` (that it is the look-at point, not the eye: **I**; the log shows both) |
+| Create item | the typed item, N single adds (inventory full → on the ground) |
+
 - Knock out (**M**, 1.0.65 disassembly): `MedicalSystem::reassessCollapseMode` (0x648890) sets
   `unconcious` (`+0x161`) when `knockoutTimer` (`+0xA0`) is above a threshold, among other triggers
   (blood, a part's collapse stage, hunger). It runs from the periodic medical update, not every frame, so
-  the fall may come a moment later; the timer's unit is not measured. Without the timer reset, a healed
-  character would stay down.
-- The keys still reach the game (not swallowed); Kenshi's own bindings for Ctrl+Shift+letter are not checked.
-  No sound in the Windows sound scheme → no beep; the log stays.
-
-| Keys | Action |
-|---|---|
-| Ctrl+Shift+H | heal: every part to max health, stun damage 0, blood to `getMaxBlood`, bleed rate 0 (the probe's measured full heal), knockout timer 0 |
-| Ctrl+Shift+J | damage: each non-robotic part loses 30 % of its max health, never below -50 % (margin to death: **I**) |
-| Ctrl+Shift+K | knock out: torso and head parts get stun damage so their health reads -20 % (stun recovers), and `MedicalSystem::knockoutTimer` is raised to 20 |
-| Ctrl+Shift+U | spawn the current item of the list into the inventory (full → on the ground) |
-| Ctrl+Shift+O | next item of the list |
-| Ctrl+Shift+T | teleport to the camera centre (`GameWorld::getCameraCenter`; that it is the point the camera looks at, not the eye: **I**, the log shows both) |
-
-- Off unless `mods\KenshiPure\KenshiPure-cheats.cfg` holds `cheats=1` (its own file, because
-  `install-client.ps1` rewrites `KenshiPure.cfg` on every install). Also there: `cheat_item=<exact name or
-  string ID>[*count]` (repeatable, count 1–100; none → `Bread*5`, `Katana`, `Samurai Armour`) and
-  `cheat_weapon_maker=<name or string ID>` (default `1057-gamedata.base`). Uninstall leaves this file.
+  the fall may come a moment later; the timer's unit is not measured.
+- Not checked yet (needs a run): whether clicks on the window also reach the game world, text fitting at
+  other UI scales, whether Ctrl+Shift+C does something in Kenshi too.
 - Single-player only by intent: nothing stops it in a multiplayer session yet (needed before M3 is used with
   others).
 
@@ -266,16 +274,15 @@ rules above); their callees (`tryAddItem`, the section's `addItem`, ...) were no
 
 ## Test steps for the user (after M3, with the game free)
 
-1. Install the new build (`scripts/install-client.ps1`, with `-ProbeWrite` if the probe should also write).
-2. Switch the cheats on once (PowerShell, Kenshi's folder may differ):
-   `Set-Content "C:\Program Files (x86)\Steam\steamapps\common\Kenshi\mods\KenshiPure\KenshiPure-cheats.cfg" "cheats=1" -Encoding ASCII`
-3. Start Kenshi, load a save, select one of your characters, then try each key, also once while paused:
-   Ctrl+Shift+J three or four times (health bars drop; the character may fall over), Ctrl+Shift+H (all
-   healthy again), Ctrl+Shift+K (falls unconscious, wakes up later by itself), Ctrl+Shift+U (5 bread in the
-   bag, one stack), Ctrl+Shift+O then U (a katana), O then U (samurai armour), move the camera away and
-   Ctrl+Shift+T (the character stands where the camera looks; once more while paused, then unpause).
-4. Tell Claude what you saw, and whether a key also did something else in the game. Claude reads the
-   `cheat:` lines in `KenshiPure.log`.
+1. Claude installs the new build with the cheats (`install-client.ps1 -Cheats`); nothing to type.
+2. Start Kenshi and load a save. The "KenshiPure cheats" window appears; select one of your characters
+   (its name shows in the window).
+3. Press each button once, also once while paused: Damage three or four times (health bars drop, the
+   character may fall over), Heal (healthy again), Knock out (falls unconscious, wakes later by itself),
+   Create item with Bread and amount 5 (one stack of 5 in the bag), then Katana, then Samurai Armour;
+   move the camera away and press Teleport to camera (once more while paused, then unpause).
+4. Tell Claude what you saw: does the window look right, did a click also move your character, did
+   anything go wrong. Claude reads `KenshiPureCheats.log`.
 
 # Client plugin: display fix
 

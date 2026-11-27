@@ -230,7 +230,7 @@ extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
     }
     kp::Log("frame: hook installed; waiting for the first frame");
     kp::PoseInit();
-    kp::CheatInit();
+    kp::CheatInit(host);
     if (kp::FeatureOn("optional:probe")) kp::ProbeStart();
     else kp::Log("probe: off (its addresses are not all resolved for this build)");
     return 1;

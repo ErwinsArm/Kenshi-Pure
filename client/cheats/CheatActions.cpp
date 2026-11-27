@@ -1,12 +1,12 @@
-// KenshiPure cheat hotkeys (see Cheat.h, docs/client.md "Cheat hotkeys").
-// Hotkeys, not a drawn window: they are read with GetAsyncKeyState in our frame listener, so they do
-// not depend on Kenshi's renderer or GUI and work in full screen, windowed and while paused.
+// KenshiPure cheats: the actions behind the cheat window (heal, damage, knock out, create item,
+// teleport). Part of KenshiPureCheats.dll (docs/client.md "Cheat window").
 // Every game access runs on the game thread inside __try and copies plain data (as Probe.cpp does).
 // Built with the VC++ 2010 (v100) toolset; keep to C++ that compiler accepts.
-#include "Cheat.h"
+#include "CheatActions.h"
 #include "Log.h"
 
 #include <windows.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,37 +16,37 @@
 #include "Game.h"
 
 #define KP_CHEAT_MAX_ITEMS 32
-#define KP_CHEAT_MAX_COUNT 100
 #define KP_CHEAT_MAX_OWNED 256
 
 namespace
 {
-    bool g_on = false;
-
-    struct ItemEntry { char key[96]; int count; };
-    ItemEntry g_items[KP_CHEAT_MAX_ITEMS];
+    char g_items[KP_CHEAT_MAX_ITEMS][96];
     int g_itemCount = 0;
-    int g_itemIndex = 0;
     // The weapon maker passed to createItem for weapons (the game's own fallback maker by default).
     char g_weaponMaker[96] = "1057-gamedata.base";
+    // Result of the last action, for the window's status line.
+    char g_msg[256] = "";
 
-    enum Action { A_HEAL, A_DAMAGE, A_KNOCKOUT, A_SPAWN, A_NEXT_ITEM, A_TELEPORT, A_COUNT };
-    const int kKeys[A_COUNT] = { 'H', 'J', 'K', 'U', 'O', 'T' };
-    const char* const kActionNames[A_COUNT] = { "heal", "damage", "knock out", "spawn item", "next item", "teleport" };
-    bool g_down[A_COUNT];
+    // Logs "cheat: ..." and keeps the text as the last result.
+    void Say(const char* fmt, ...)
+    {
+        va_list a;
+        va_start(a, fmt);
+        _vsnprintf_s(g_msg, sizeof(g_msg), _TRUNCATE, fmt, a);
+        va_end(a);
+        kp::Log("cheat: %s", g_msg);
+    }
 
-    // A teleport made while paused is checked again once the game runs (see CheckTeleport).
+    // A teleport is checked again once the game has run for a second (see CheckTeleport).
     struct PendingTeleport
     {
         bool active;
         Character* who;
         float to[3];
         ULONGLONG madeAt;
-        ULONGLONG runningSince;   // 0 until the game is unpaused
+        ULONGLONG runningSince;   // 0 until the game runs
     };
     PendingTeleport g_tp;
-
-    void Beep(bool ok) { MessageBeep(ok ? MB_OK : MB_ICONHAND); }
 
     void Trim(char* s)
     {
@@ -57,30 +57,19 @@ namespace
         if (i) memmove(s, s + i, n - i + 1);
     }
 
-    void AddItem(const char* spec)
+    void AddItem(const char* name)
     {
         if (g_itemCount >= KP_CHEAT_MAX_ITEMS) return;
-        ItemEntry& e = g_items[g_itemCount];
-        _snprintf_s(e.key, sizeof(e.key), _TRUNCATE, "%s", spec);
-        e.count = 1;
-        char* star = strrchr(e.key, '*');
-        if (star)
-        {
-            *star = 0;
-            e.count = atoi(star + 1);
-        }
-        Trim(e.key);
-        if (e.count < 1) e.count = 1;
-        if (e.count > KP_CHEAT_MAX_COUNT) e.count = KP_CHEAT_MAX_COUNT;
-        if (e.key[0]) ++g_itemCount;
+        char* e = g_items[g_itemCount];
+        _snprintf_s(e, sizeof(g_items[0]), _TRUNCATE, "%s", name);
+        Trim(e);
+        if (e[0]) ++g_itemCount;
     }
 
-    // KenshiPure-cheats.cfg (its own file: install-client.ps1 rewrites KenshiPure.cfg on every install):
-    // cheats=1 switches the hotkeys on; cheat_item=<name or string ID>[*count] (repeatable);
-    // cheat_weapon_maker=<name or string ID>.
-    bool ReadCfg()
+    // Optional KenshiPure-cheats.cfg next to the DLL: cheat_item=<name or string ID> (repeatable, the
+    // item list of the window) and cheat_weapon_maker=<name or string ID>.
+    void ReadCfg()
     {
-        bool on = false;
         wchar_t path[MAX_PATH];
         _snwprintf_s(path, MAX_PATH, _TRUNCATE, L"%sKenshiPure-cheats.cfg", kp::PluginDir());
         FILE* f = NULL;
@@ -95,8 +84,7 @@ namespace
                 char* value = eq + 1;
                 Trim(line);
                 Trim(value);
-                if (strcmp(line, "cheats") == 0) on = atoi(value) != 0;
-                else if (strcmp(line, "cheat_item") == 0) AddItem(value);
+                if (strcmp(line, "cheat_item") == 0) AddItem(value);
                 else if (strcmp(line, "cheat_weapon_maker") == 0 && value[0])
                     _snprintf_s(g_weaponMaker, sizeof(g_weaponMaker), _TRUNCATE, "%s", value);
             }
@@ -105,11 +93,10 @@ namespace
         if (g_itemCount == 0)
         {
             // Found by name in the probe run (docs/client.md "Live game probe").
-            AddItem("Bread*5");
+            AddItem("Bread");
             AddItem("Katana");
             AddItem("Samurai Armour");
         }
-        return on;
     }
 
     // ---------------------------------------------------------------- target character
@@ -289,12 +276,12 @@ namespace
     bool DoMedical(GameWorld* gw, MedicalMode mode, const char* what)
     {
         Character* c = Selected(gw);
-        if (!c) { kp::Log("cheat: %s - no own character selected", what); return false; }
+        if (!c) { Say("%s - no own character selected", what); return false; }
         char nm[96];
         SafeName(c, nm, sizeof(nm));
         MedicalResult r;
-        if (!MedicalOne(c, mode, &r)) { kp::Log("cheat: %s %s - faulted or no medical system", what, nm); return false; }
-        kp::Log("cheat: %s %s - %d parts changed, blood %.1f -> %.1f, knockout timer %.1f", what, nm, r.parts, r.bloodBefore,
+        if (!MedicalOne(c, mode, &r)) { Say("%s %s - faulted or no medical system", what, nm); return false; }
+        Say("%s %s - %d parts changed, blood %.1f -> %.1f, knockout timer %.1f", what, nm, r.parts, r.bloodBefore,
                 r.bloodAfter, r.koTimer);
         return r.parts > 0;
     }
@@ -387,36 +374,35 @@ namespace
         }
     }
 
-    bool DoSpawn(GameWorld* gw)
+    bool DoSpawn(GameWorld* gw, const char* key, int count)
     {
-        const ItemEntry& e = g_items[g_itemIndex];
         Character* c = Selected(gw);
-        if (!c) { kp::Log("cheat: spawn item - no own character selected"); return false; }
+        if (!c) { Say("spawn item - no own character selected"); return false; }
         GameData* gd = NULL;
         itemType type = ITEM;
-        if (!SafeFind(gw, e.key, &gd, &type)) { kp::Log("cheat: spawn \"%s\" - a game call faulted", e.key); return false; }
-        if (!gd) { kp::Log("cheat: spawn \"%s\" - no item, weapon, armour or crossbow with that name or ID", e.key); return false; }
+        if (!SafeFind(gw, key, &gd, &type)) { Say("spawn \"%s\" - a game call faulted", key); return false; }
+        if (!gd) { Say("spawn \"%s\" - no item, weapon, armour or crossbow with that name or ID", key); return false; }
         GameData* maker = NULL;
         if (type == WEAPON)
         {
             if (!SafeFindMaker(gw, &maker) || !maker)
             {
-                kp::Log("cheat: spawn \"%s\" - weapon maker \"%s\" not found (cheat_weapon_maker)", e.key, g_weaponMaker);
+                Say("spawn \"%s\" - weapon maker \"%s\" not found (cheat_weapon_maker)", key, g_weaponMaker);
                 return false;
             }
         }
         char made[96] = "";
         int added = 0, dropped = 0, result = 1, firstQty = -1;
-        for (int i = 0; i < e.count; ++i)
+        for (int i = 0; i < count; ++i)
         {
             result = SpawnUnit(gw, c, gd, maker, made, sizeof(made), &firstQty);
             if (result == 1) ++added;
             else if (result == 2) ++dropped;
             else break;
         }
-        kp::Log("cheat: spawn \"%s\" x%d (category %d%s) -> made \"%s\" (quantity %d when made), %d in the inventory, "
+        Say("spawn \"%s\" x%d (category %d%s) -> made \"%s\" (quantity %d when made), %d in the inventory, "
                 "%d dropped on the ground%s",
-                e.key, e.count, (int)type, maker ? ", through the weapon maker" : "", made, firstQty, added, dropped,
+                key, count, (int)type, maker ? ", through the weapon maker" : "", made, firstQty, added, dropped,
                 result == 0 ? "; the item factory returned nothing" : result < 0 ? "; a game call faulted" : "");
         return added + dropped > 0;
     }
@@ -473,17 +459,17 @@ namespace
     bool DoTeleport(GameWorld* gw)
     {
         Character* c = Selected(gw);
-        if (!c) { kp::Log("cheat: teleport - no own character selected"); return false; }
+        if (!c) { Say("teleport - no own character selected"); return false; }
         char nm[96];
         SafeName(c, nm, sizeof(nm));
         float from[3] = { 0, 0, 0 }, to[3], after[3] = { 0, 0, 0 };
         bool paused = false;
         SafePaused(gw, &paused);
         SafePosition(c, from);
-        if (!SafeCamera(gw, to)) { kp::Log("cheat: teleport %s - camera centre unreadable", nm); return false; }
-        if (!SafeTeleport(c, to)) { kp::Log("cheat: teleport %s - faulted", nm); return false; }
+        if (!SafeCamera(gw, to)) { Say("teleport %s - camera centre unreadable", nm); return false; }
+        if (!SafeTeleport(c, to)) { Say("teleport %s - faulted", nm); return false; }
         SafePosition(c, after);
-        kp::Log("cheat: teleport %s%s from %.1f %.1f %.1f to camera centre %.1f %.1f %.1f; position right after %.1f %.1f %.1f",
+        Say("teleport %s%s from %.1f %.1f %.1f to camera centre %.1f %.1f %.1f; position right after %.1f %.1f %.1f",
                 nm, paused ? " (paused)" : "", from[0], from[1], from[2], to[0], to[1], to[2], after[0], after[1], after[2]);
         g_tp.active = true;
         g_tp.who = c;
@@ -510,80 +496,53 @@ namespace
         if (now - g_tp.runningSince < 1000) return;
         float pos[3];
         if (!SafePosition(g_tp.who, pos)) { g_tp.active = false; return; }
-        kp::Log("cheat: teleport check after 1 s of running game: at %.1f %.1f %.1f, %.1f from the target (x/z)",
+        Say("teleport check after 1 s of running game: at %.1f %.1f %.1f, %.1f from the target (x/z)",
                 pos[0], pos[1], pos[2], DistXZ(pos, g_tp.to));
         g_tp.active = false;
-    }
-
-    // ---------------------------------------------------------------- keys
-
-    bool GameInFront()
-    {
-        HWND w = GetForegroundWindow();
-        DWORD pid = 0;
-        if (w) GetWindowThreadProcessId(w, &pid);
-        return pid == GetCurrentProcessId();
-    }
-
-    bool Down(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
-
-    void Run(GameWorld* gw, int a)
-    {
-        bool ok = false;
-        switch (a)
-        {
-        case A_HEAL: ok = DoMedical(gw, M_HEAL, "heal"); break;
-        case A_DAMAGE: ok = DoMedical(gw, M_DAMAGE, "damage"); break;
-        case A_KNOCKOUT: ok = DoMedical(gw, M_KNOCKOUT, "knock out"); break;
-        case A_SPAWN: ok = DoSpawn(gw); break;
-        case A_NEXT_ITEM:
-            g_itemIndex = (g_itemIndex + 1) % g_itemCount;
-            kp::Log("cheat: next item %d/%d: \"%s\" x%d", g_itemIndex + 1, g_itemCount, g_items[g_itemIndex].key,
-                    g_items[g_itemIndex].count);
-            ok = true;
-            break;
-        case A_TELEPORT: ok = DoTeleport(gw); break;
-        }
-        Beep(ok);
     }
 }
 
 namespace kp
 {
-    void CheatInit()
+    namespace cheat
     {
-        if (!ReadCfg())
+        bool Init()
         {
-            Log("cheat: off (no cheats=1 in KenshiPure-cheats.cfg)");
-            return;
+            ReadCfg();
+            const char* features[] = { "optional:probe", "optional:probe-write", "optional:cheat-write" };
+            for (size_t i = 0; i < sizeof(features) / sizeof(features[0]); ++i)
+                if (!FeatureOn(features[i]))
+                {
+                    Log("cheat: off (feature %s has unresolved addresses for this build)", features[i]);
+                    return false;
+                }
+            for (int i = 0; i < g_itemCount; ++i) Log("cheat: item %d/%d: \"%s\"", i + 1, g_itemCount, g_items[i]);
+            Log("cheat: weapon maker \"%s\"", g_weaponMaker);
+            return true;
         }
-        const char* features[] = { "optional:probe", "optional:probe-write", "optional:cheat-write" };
-        for (size_t i = 0; i < sizeof(features) / sizeof(features[0]); ++i)
-            if (!FeatureOn(features[i]))
-            {
-                Log("cheat: off (feature %s has unresolved addresses for this build)", features[i]);
-                return;
-            }
-        g_on = true;
-        Log("cheat: on - Ctrl+Shift with H heal, J damage, K knock out, U spawn item, O next item, T teleport to the camera centre");
-        for (int i = 0; i < g_itemCount; ++i) Log("cheat: item %d/%d: \"%s\" x%d", i + 1, g_itemCount, g_items[i].key, g_items[i].count);
-        Log("cheat: weapon maker \"%s\"", g_weaponMaker);
-    }
 
-    void CheatOnFrame(GameWorld* gw)
-    {
-        if (!g_on) return;
-        CheckTeleport(gw);
-        bool armed = GameInFront() && Down(VK_CONTROL) && Down(VK_SHIFT) && !Down(VK_MENU);
-        for (int a = 0; a < A_COUNT; ++a)
+        int ItemCount() { return g_itemCount; }
+        const char* ItemName(int i) { return i >= 0 && i < g_itemCount ? g_items[i] : ""; }
+        const char* LastResult() { return g_msg; }
+
+        void SelectedName(GameWorld* gw, char* out, size_t outSize)
         {
-            bool down = armed && Down(kKeys[a]);
-            if (down && !g_down[a])
-            {
-                Log("cheat: Ctrl+Shift+%c (%s)", (char)kKeys[a], kActionNames[a]);
-                Run(gw, a);
-            }
-            g_down[a] = down;
+            Character* c = Selected(gw);
+            if (c) SafeName(c, out, outSize);
+            else _snprintf_s(out, outSize, _TRUNCATE, "");
         }
+
+        bool Heal(GameWorld* gw) { return DoMedical(gw, M_HEAL, "heal"); }
+        bool Damage(GameWorld* gw) { return DoMedical(gw, M_DAMAGE, "damage"); }
+        bool KnockOut(GameWorld* gw) { return DoMedical(gw, M_KNOCKOUT, "knock out"); }
+        bool Teleport(GameWorld* gw) { return DoTeleport(gw); }
+        bool Spawn(GameWorld* gw, const char* key, int count)
+        {
+            if (count < 1) count = 1;
+            if (count > 100) count = 100;
+            if (!key || !key[0]) { Say("create item - no item name given"); return false; }
+            return DoSpawn(gw, key, count);
+        }
+        void OnFrame(GameWorld* gw) { CheckTeleport(gw); }
     }
 }

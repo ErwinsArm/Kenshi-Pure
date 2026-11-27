@@ -1,15 +1,16 @@
-// KenshiPure cheat hotkeys: the user's single-player testing tool (heal, damage, knock out, spawn
-// item, teleport). Off unless mods\KenshiPure\KenshiPure-cheats.cfg holds cheats=1. See docs/client.md "Cheat hotkeys".
+// KenshiPure side of the optional cheats (CheatHost.cpp): loads KenshiPureCheats.dll if it is next
+// to KenshiPure.dll and forwards the frame to it. See docs/client.md "Cheat window".
 // Built with the VC++ 2010 (v100) toolset; keep to C++ that compiler accepts.
 #pragma once
+
+#include "KpHost.h"
 
 class GameWorld;
 
 namespace kp
 {
-    // Reads KenshiPure-cheats.cfg (cheats, cheat_item, cheat_weapon_maker) and checks the rows the cheats
-    // need; logs the keys or why the cheats are off. Call once from kpStart.
-    void CheatInit();
-    // Frame listener part (game thread, after the game's frame): polls the hotkeys and runs them.
+    // Loads and starts KenshiPureCheats.dll when present (logs either way). Call once from kpStart.
+    void CheatInit(const KpHost* host);
+    // Frame listener part (game thread, after the game's frame).
     void CheatOnFrame(GameWorld* gw);
 }
