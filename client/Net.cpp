@@ -1,10 +1,12 @@
 // M3 game adapter for networking: reads KenshiPure.cfg, loads KenshiPureCore.dll from the plugin
-// folder, and runs NetFrame on the frame thread with the pose from Pose.cpp (no other game access).
+// folder, and runs NetFrame on the frame thread with the pose from Pose.cpp; the M4 stand-in calls go
+// to StandIn.cpp.
 // Any problem (no host line, no core DLL, wrong core version, bad config) leaves networking off and
 // the rest of the plugin untouched. Built with the VC++ 2010 (v100) toolset.
 #include "Net.h"
 #include "NetFrame.h"
 #include "Pose.h"
+#include "StandIn.h"
 #include "Log.h"
 
 #include <windows.h>
@@ -26,9 +28,18 @@ namespace
             out->paused = s.paused;
             out->tick = s.tick;
             out->epoch = s.epoch;
+            out->worldEpoch = s.worldEpoch;
             return true;
         }
         void Log(const char* line) { kp::Log("%s", line); }
+        bool StandInPick(const float* nearPos, const kp::DriveConfig& cfg, kp::StandInInfo* out)
+        {
+            return kp::StandInPickNpc(nearPos, cfg, out);
+        }
+        bool StandInRead(kp::BodyState* out) { return kp::StandInReadBody(out); }
+        bool StandInApply(const kp::DriveCmd& cmd, int mode) { return kp::StandInApplyCmd(cmd, mode); }
+        void StandInSkipAi(bool on) { kp::StandInSetSkip(on); }
+        void StandInRelease(bool worldGone) { kp::StandInDrop(worldGone); }
     };
 
     GameAccess g_game;
@@ -81,6 +92,10 @@ namespace kp
         cfg.log = CoreLog;
         cfg.logCtx = NULL;
         Log("net: %s; server %s:%u, name %s", api->build ? api->build : "?", cfg.host, cfg.port, cfg.name);
+        kp::DriveConfig drive;
+        kp::DriveParseConfig(text, &drive);
+        kp::StandInInit(&drive);   // logs; off (mode DM_OFF) when a row or the detour is missing
+        g_net.SetDrive(drive);
         if (!g_net.Start(api, cfg, &g_game)) return;   // the core logged why
         g_on = true;
     }

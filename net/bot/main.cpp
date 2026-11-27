@@ -1,5 +1,7 @@
 // kp-bot: a test player that connects to the relay server and walks a circle.
-//   kp-bot [--host H] [--port N] [--name S] [--center x,y,z] [--radius R] [--speed V] [--seconds N]
+//   kp-bot [--host H] [--port N] [--name S] [--center x,y,z | --around-first] [--radius R] [--speed V] [--seconds N]
+// --around-first: wait for the first other player's pose and circle around where it was then (in-game
+// tests: the circle lies around the tester wherever they stand).
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -17,7 +19,7 @@ void onSignal(int) { g_stop = true; }
 constexpr double kPi = 3.14159265358979323846;
 
 int usage() {
-    std::printf("usage: kp-bot [--host H] [--port N] [--name S] [--center x,y,z] [--radius R] [--speed V] [--seconds N]\n"
+    std::printf("usage: kp-bot [--host H] [--port N] [--name S] [--center x,y,z | --around-first] [--radius R] [--speed V] [--seconds N]\n"
                 "  defaults: --host 127.0.0.1 --port %u --name bot --center 0,0,0 --radius 50 --speed 20 (units/s)\n"
                 "  --seconds 0 (default) runs until Ctrl+C\n", kp::proto::kDefaultPort);
     return 2;
@@ -28,8 +30,10 @@ int main(int argc, char** argv) {
     std::string host = "127.0.0.1", name = "bot";
     long port = kp::proto::kDefaultPort;
     double cx = 0, cy = 0, cz = 0, radius = 50, speed = 20, seconds = 0;
+    bool aroundFirst = false;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
+        if (a == "--around-first") { aroundFirst = true; continue; }
         if (i + 1 >= argc) return usage();
         std::string v = argv[++i];
         if (a == "--host") host = v;
@@ -53,6 +57,8 @@ int main(int argc, char** argv) {
     std::vector<kp::net::ClientEvent> events;
     std::size_t lastSeen = 0;
     auto lastSnap = start;   // the server sends no empty snapshots: none for a while = nobody to see
+    bool haveCenter = !aroundFirst;
+    if (aroundFirst) std::printf("waiting for another player's pose to circle around\n");
     while (!g_stop) {
         events.clear();
         c.poll(5, events);
@@ -63,7 +69,17 @@ int main(int argc, char** argv) {
             case K::Rejected: std::printf("rejected (reason %d)\n", static_cast<int>(e.reject)); return 1;
             case K::Joined: std::printf("player %u joined: %s\n", e.playerId, e.name.c_str()); break;
             case K::Left: std::printf("player %u left (reason %d)\n", e.playerId, static_cast<int>(e.leave)); break;
-            case K::Snapshot: lastSeen = e.snapshot.entries.size(); lastSnap = Clock::now(); break;
+            case K::Snapshot:
+                lastSeen = e.snapshot.entries.size();
+                lastSnap = Clock::now();
+                if (!haveCenter && !e.snapshot.entries.empty()) {
+                    const auto& q = e.snapshot.entries.front();
+                    cx = q.pose.pos[0]; cy = q.pose.pos[1]; cz = q.pose.pos[2];
+                    haveCenter = true;
+                    start = nextPose = Clock::now();
+                    std::printf("circling around player %u at %.1f %.1f %.1f\n", q.playerId, cx, cy, cz);
+                }
+                break;
             case K::Disconnected: std::printf("disconnected\n"); return 1;
             }
         }
@@ -71,7 +87,7 @@ int main(int argc, char** argv) {
         if (now - lastSnap > std::chrono::milliseconds(500)) lastSeen = 0;
         double t = std::chrono::duration<double>(now - start).count();
         if (seconds > 0 && t >= seconds) break;
-        if (c.welcomed() && now >= nextPose) {
+        if (c.welcomed() && haveCenter && now >= nextPose) {
             nextPose += std::chrono::milliseconds(100);
             double w = speed / radius;               // radians per second
             double a = w * t;

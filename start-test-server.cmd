@@ -12,4 +12,4 @@ if not exist "build\net\Release\kp-server.exe" (
 start "KenshiPure server" powershell -NoProfile -ExecutionPolicy Bypass -Command "& '.\build\net\Release\kp-server.exe' --local --log-poses | Tee-Object -FilePath 'build\net\kp-server.log'"
 rem Wait a second so the server listens before the bot connects (ping works without a console input).
 ping -n 2 127.0.0.1 >nul
-start "KenshiPure test bot" powershell -NoProfile -ExecutionPolicy Bypass -Command "& '.\build\net\Release\kp-bot.exe' --name bot | Tee-Object -FilePath 'build\net\kp-bot.log'"
+start "KenshiPure test bot" powershell -NoProfile -ExecutionPolicy Bypass -Command "& '.\build\net\Release\kp-bot.exe' --name bot --around-first --radius 300 --speed 60 | Tee-Object -FilePath 'build\net\kp-bot.log'"

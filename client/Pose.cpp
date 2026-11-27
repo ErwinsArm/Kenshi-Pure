@@ -34,6 +34,7 @@ namespace
     Where g_where = W_UNKNOWN;
     Character* g_lastChar = NULL;
     unsigned int g_epoch = 0;
+    unsigned int g_worldEpoch = 0;
     unsigned long long g_lastSampleAt = 0;   // a gap > 2 s (load stall) starts a new epoch too
 
     __declspec(noinline) void CopyName(Character* c, char* out, size_t outSize)
@@ -190,6 +191,7 @@ namespace kp
         s.tick = now;
         s.yawDeg = YawDegFromQuat(s.quat[0], s.quat[1], s.quat[2], s.quat[3]);
         s.walking = DistXZ2(s.pos, s.pathDest) > 4.0f ? 1 : 0;
+        if (g_where != W_CHAR || gap) ++g_worldEpoch;
         if (g_where != W_CHAR || who != g_lastChar || gap)
         {
             Log("pose: local character %s (%s, %u owned)", s.name, s.selected ? "selected" : "first owned", s.owned);
@@ -197,6 +199,7 @@ namespace kp
             ++g_epoch;
         }
         s.epoch = g_epoch;
+        s.worldEpoch = g_worldEpoch;
         g_where = W_CHAR;
         g_lastChar = who;
         g_latest = s;

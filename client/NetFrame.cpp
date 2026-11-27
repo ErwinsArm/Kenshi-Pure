@@ -83,10 +83,18 @@ namespace kp
 
     NetFrame::NetFrame()
         : api_(0), core_(0), game_(0), lastTick_(0), haveEpoch_(false),
-          epoch_(0), epochStart_(0), firstOfEpochDropped_(false), settled_(false)
+          epoch_(0), epochStart_(0), firstOfEpochDropped_(false), settled_(false),
+          localOk_(false), localEpoch_(0), localPaused_(false), trackId_(0), siOn_(false), siEpoch_(0),
+          nextPick_(0), lastStatus_(0), lastNoPickLog_(0), phaseStart_(0), phase_(0), phaseAiSkip_(false),
+          applyFails_(0), lastGap_(0.0f)
     {
         memset(&stats_, 0, sizeof(stats_));
         memset(players_, 0, sizeof(players_));
+        memset(localPos_, 0, sizeof(localPos_));
+        memset(&si_, 0, sizeof(si_));
+        memset(&lastBody_, 0, sizeof(lastBody_));
+        memset(&lastCmd_, 0, sizeof(lastCmd_));
+        DriveParseConfig("", &drive_);   // off
     }
 
     void NetFrame::Logf(const char* fmt, ...)
@@ -113,6 +121,10 @@ namespace kp
 
     void NetFrame::Stop()
     {
+        // Game exit (or a restart): forget the stand-in without calling into a world that may be going away.
+        if (siOn_) Release(0, true, "networking stops");
+        track_.Clear();
+        trackId_ = 0;
         KpCore* c = core_;
         core_ = 0;   // nothing may use the core while (or after) it stops
         if (c && api_) api_->stop(c);
@@ -157,7 +169,15 @@ namespace kp
         // Checked every frame; the game adapter samples at 10 Hz, so each new sample goes out once.
         NetLocalSample s;
         memset(&s, 0, sizeof(s));
-        if (!game_->LocalPose(&s)) return;     // menu or loading: the server keeps our last pose (its age grows)
+        if (!game_->LocalPose(&s))
+        {
+            localOk_ = false;
+            return;                            // menu or loading: the server keeps our last pose (its age grows)
+        }
+        localOk_ = true;
+        for (int i = 0; i < 3; ++i) localPos_[i] = s.pos[i];
+        localEpoch_ = s.worldEpoch;   // the stand-in is released on a world change, not on a click on another own character
+        localPaused_ = s.paused != 0;
         if (s.tick == lastTick_) return;       // nothing new since the last send
         lastTick_ = s.tick;
         if (!haveEpoch_ || s.epoch != epoch_)
@@ -210,6 +230,7 @@ namespace kp
                 {
                 case KP_EV_WELCOME:
                     memset(players_, 0, sizeof(players_));   // a new session: nobody is known yet
+                    ForgetTrack(0);
                     break;
                 case KP_EV_JOINED:
                     Add((unsigned short)e.a, e.name);
@@ -220,11 +241,13 @@ namespace kp
                     Player* p = Find((unsigned short)e.a);
                     Logf("net: player %u (%s) left (%s)", e.a, p ? p->name : "?", LeaveText(e.b));
                     if (p) memset(p, 0, sizeof(*p));
+                    ForgetTrack((unsigned short)e.a);
                     break;
                 }
                 case KP_EV_LOST:
                 case KP_EV_CONNECT_FAILED:
                     memset(players_, 0, sizeof(players_));   // the core logs why
+                    ForgetTrack(0);
                     break;
                 default:
                     break;
@@ -244,6 +267,11 @@ namespace kp
                 if (!p) continue;
                 p->last = rp[i];
                 p->havePose = true;
+                if (drive_.mode != DM_OFF)
+                {
+                    if (trackId_ == 0) trackId_ = rp[i].playerId;   // the first remote player drives the stand-in
+                    if (rp[i].playerId == trackId_) track_.Add(nowMs, rp[i]);
+                }
                 if (!p->logged || nowMs - p->lastLog >= (unsigned long long)kRemoteLogMs)
                 {
                     p->logged = true;
@@ -263,5 +291,137 @@ namespace kp
         if (!core_) return;
         SendLocal(nowMs);
         Drain(nowMs);
+        DriveFrame(nowMs);
+    }
+
+    // ------------------------------------------------------------------ stand-in (M4)
+
+    namespace
+    {
+        // The cycle: place (proves coordinates); path = CharMovement::setDestination with the AI skipped
+        // (candidate A, movement half); order = Character::setDestination with the AI on (candidate A, order
+        // half: its TASK_MOVE job is ticked by the AI, so skipping the AI would stall it); steer =
+        // setDirectMovement with the AI skipped (candidate B).
+        struct Phase { int mode; bool aiSkip; unsigned int ms; };
+        const Phase kCycle[] = {
+            { DM_PLACE, true, 20000 }, { DM_PATH, true, 45000 }, { DM_ORDER, false, 45000 }, { DM_STEER, true, 45000 },
+        };
+        const int kCycleCount = (int)(sizeof(kCycle) / sizeof(kCycle[0]));
+
+        const char* CmdName(int k)
+        {
+            switch (k)
+            {
+            case DC_PLACE: return "place";
+            case DC_SNAP: return "snap";
+            case DC_WALK: return "walk";
+            case DC_STEER: return "steer";
+            case DC_HALT: return "halt";
+            default: return "-";
+            }
+        }
+    }
+
+    void NetFrame::ForgetTrack(unsigned short playerId)
+    {
+        if (playerId != 0 && playerId != trackId_) return;
+        track_.Clear();
+        trackId_ = 0;   // DriveFrame releases the stand-in when its track is empty
+    }
+
+    void NetFrame::StartPhase(unsigned long long nowMs, int phase)
+    {
+        phase_ = phase;
+        phaseStart_ = nowMs;
+        int mode = drive_.mode == DM_CYCLE ? kCycle[phase].mode : drive_.mode;
+        phaseAiSkip_ = drive_.aiSkip != DA_NONE && (drive_.mode != DM_CYCLE || kCycle[phase].aiSkip);
+        planner_.Reset(mode, drive_.snapDist);
+        game_->StandInSkipAi(phaseAiSkip_);
+        Logf("standin: phase %s, own AI %s", DriveModeName(mode), phaseAiSkip_ ? "skipped" : "on");
+    }
+
+    void NetFrame::LogPhaseSummary(const char* why)
+    {
+        const DriveStats& s = planner_.Stats();
+        if (s.samples == 0) return;
+        Logf("standin: phase %s (AI %s) %s: %u frames, gap mean %.1f max %.1f, body moving %.0f%%, snaps %u, walk orders %u",
+             DriveModeName(planner_.Mode()), phaseAiSkip_ ? "skipped" : "on", why, s.samples, s.gapSum / (float)s.samples,
+             s.gapMax, 100.0f * (float)s.moving / (float)s.samples, s.snaps, s.orders);   // kp-not-game: DriveStats
+    }
+
+    void NetFrame::Release(unsigned long long nowMs, bool worldGone, const char* why)
+    {
+        if (!siOn_) return;
+        LogPhaseSummary("ended");
+        siOn_ = false;
+        game_->StandInRelease(worldGone);
+        Logf("standin: released %s (%s)%s", si_.name, why, worldGone ? "" : ", put back where it stood");
+        nextPick_ = nowMs + kPickEveryMs;
+    }
+
+    void NetFrame::DriveFrame(unsigned long long nowMs)
+    {
+        if (drive_.mode == DM_OFF || !game_) return;
+        bool fresh = !track_.Empty() && nowMs - track_.LastAddMs() <= (unsigned long long)kRemoteStaleMs;
+        if (siOn_)
+        {
+            // World unload/load or another own character: the old body may be gone; never touch it.
+            if (!localOk_) { Release(nowMs, true, "no own character: menu or loading"); return; }
+            if (localEpoch_ != siEpoch_) { Release(nowMs, true, "the world changed (load)"); return; }
+            if (!fresh) { Release(nowMs, false, "no fresh remote pose for 3 s"); return; }
+            BodyState b;
+            memset(&b, 0, sizeof(b));
+            if (!game_->StandInRead(&b)) { Release(nowMs, true, "its handle no longer resolves"); return; }
+            lastBody_ = b;
+            if (drive_.mode == DM_CYCLE && nowMs - phaseStart_ >= kCycle[phase_].ms)
+            {
+                LogPhaseSummary("done");
+                StartPhase(nowMs, (phase_ + 1) % kCycleCount);
+            }
+            if (localPaused_) return;   // the game drops teleports while paused (probe); nothing moves anyway
+            TrackSample target;
+            if (!track_.At(nowMs - DrivePlanner::kRenderDelayMs, &target)) return;
+            DriveCmd c = planner_.Step(nowMs, b, target, &lastGap_);
+            if (c.kind != DC_NONE)
+            {
+                lastCmd_ = c;
+                if (game_->StandInApply(c, planner_.Mode())) applyFails_ = 0;
+                else if (++applyFails_ >= kMaxApplyFails)
+                {
+                    Release(nowMs, false, "game calls faulted 3 times in a row");
+                    return;
+                }
+            }
+            if (nowMs - lastStatus_ >= (unsigned long long)kStatusMs)
+            {
+                lastStatus_ = nowMs;
+                Logf("standin: %s %s body %.1f %.1f %.1f target %.1f %.1f %.1f gap %.1f speed %.1f moving %d last %s",
+                     DriveModeName(planner_.Mode()), si_.name, b.pos[0], b.pos[1], b.pos[2], target.pos[0], target.pos[1],
+                     target.pos[2], lastGap_, b.speed, b.moving, CmdName(lastCmd_.kind));
+            }
+            return;
+        }
+        if (!localOk_ || !fresh || nowMs < nextPick_) return;
+        nextPick_ = nowMs + kPickEveryMs;
+        StandInInfo info;
+        memset(&info, 0, sizeof(info));
+        if (!game_->StandInPick(localPos_, drive_, &info))
+        {
+            if (lastNoPickLog_ == 0 || nowMs - lastNoPickLog_ >= 10000)
+            {
+                lastNoPickLog_ = nowMs;
+                Logf("standin: no NPC to drive within %.0f units%s%s", drive_.pickDist, drive_.name[0] ? " named " : "",
+                     drive_.name);
+            }
+            return;
+        }
+        si_ = info;
+        siOn_ = true;
+        siEpoch_ = localEpoch_;
+        applyFails_ = 0;
+        memset(&lastCmd_, 0, sizeof(lastCmd_));
+        Logf("standin: driving %s (%.0f units away, at %.1f %.1f %.1f) from remote player %u, mode %s", si_.name,
+             si_.distance, si_.home[0], si_.home[1], si_.home[2], trackId_, DriveModeName(drive_.mode));
+        StartPhase(nowMs, 0);
     }
 }

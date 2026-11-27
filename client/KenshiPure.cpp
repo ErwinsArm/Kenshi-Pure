@@ -1,5 +1,5 @@
 // KenshiPure client plugin: build check, address layer, per-frame hook, own pose (M1), networking
-// through KenshiPureCore.dll (M3, Net.cpp), live probe.
+// through KenshiPureCore.dll (M3, Net.cpp), the stand-in body (M4, StandIn.cpp), live probe.
 // Started by KenshiPureLoader.dll (an Ogre plugin) through kpStart (KpHost.h). Built with KenshiLib
 // 0.5.0's headers (declarations only; KenshiLib is not linked or loaded) and the VC++ 2010 (v100)
 // x64 toolset, /MD, so every C++ object crossing into Kenshi has Kenshi's own layout and heap.
@@ -20,7 +20,7 @@
 #include "Net.h"
 #include "Cheat.h"
 
-#define KP_VERSION "0.0.4-m3"
+#define KP_VERSION "0.0.5-m4"
 
 namespace
 {

@@ -25,6 +25,7 @@ namespace kp
         int paused;
         unsigned long long tick;   // GetTickCount64() when sampled
         unsigned int epoch;        // +1 whenever the local character changes or comes back after menu/loading
+        unsigned int worldEpoch;   // +1 only when it comes back after menu/loading or a load stall (not on a click on another own character)
     };
 
     // Checks the rows M1 needs; logs and returns false when one is unresolved.
