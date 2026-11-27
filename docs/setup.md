@@ -82,7 +82,9 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-build.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build-plugin.ps1
 ```
 
-Install into a Kenshi folder (RE_Kenshi optional; switches AnarchyKenshi off; `-Uninstall` switches back):
+Install into a Kenshi folder (RE_Kenshi optional; switches AnarchyKenshi off; `-Uninstall` switches back).
+It also installs the network core `KenshiPureCore.dll`, so build that first with `scripts\build-net.ps1`
+(next section); networking settings live in `KenshiPure.cfg` (`docs/client.md`, M3):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install-client.ps1 -GameDir "<Kenshi folder>"
@@ -122,15 +124,16 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-modern.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build-net.ps1
 ```
 
-The build script builds `build\net\Release\kp-server.exe` and `kp-bot.exe` (static runtime: they run
-on PCs without Visual Studio) and runs the tests (codec, and server + clients over loopback). Run
-them:
+The build script builds `build\net\Release\kp-server.exe` and `kp-bot.exe` and the client's network
+core `KenshiPureCore.dll` (static runtime: they run on PCs without Visual Studio), checks the core's
+exports and imports, and runs the tests (codec; server + clients over loopback; the core with a 60 s
+stall, ~1 min). Run them:
 
 ```powershell
 build\net\Release\kp-server.exe --port 27850
 build\net\Release\kp-bot.exe --host 127.0.0.1 --port 27850 --name Bot --radius 50 --speed 20
 ```
 
-`kp-server --local` accepts only this PC; without it Windows may ask once whether to allow it
+`kp-server --log-poses` logs each player's pose once a second. `kp-server --local` accepts only this PC; without it Windows may ask once whether to allow it
 through the firewall. `--help` lists the options. Protocol: `docs/protocol-ours.md`.
 Removal: `scripts\setup-modern.ps1 -Uninstall` (deletes `tools\modern\`) and delete `build\net\`.

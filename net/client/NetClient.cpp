@@ -34,7 +34,12 @@ bool NetClient::connect(const std::string& host, std::uint16_t port, const std::
 
 void NetClient::disconnect(int waitMs) {
     if (!host_) return;
-    if (peer_ && connected_) {
+    if (peer_ && waitMs <= 0) {
+        // No time to wait for the ack: send the disconnect at once (unsequenced), so the server
+        // does not keep a ghost peer until its ENet timeout.
+        enet_peer_disconnect_now(peer_, kDisconnectLeft);
+        peer_ = nullptr;
+    } else if (peer_ && connected_) {
         enet_peer_disconnect(peer_, kDisconnectLeft);
         auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(waitMs);
         ENetEvent ev;

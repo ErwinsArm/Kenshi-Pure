@@ -97,8 +97,10 @@ counted; the client stays connected.
 
 ENet's defaults (`ENET_PEER_TIMEOUT_LIMIT` 32, `_MINIMUM` 5000 ms, `_MAXIMUM` 30000 ms, `enet.h`
 230–232 of the pinned source, *measured*) disconnect a peer that stops acknowledging for 5–30 s.
-Kenshi's main thread stalls ~60 s while loading, so from M3 on the client services ENet on its own
-network thread (plan G14); the server keeps ENet's defaults.
+Kenshi's main thread stalls ~60 s while loading, so the client services ENet on its own network
+thread (`KenshiPureCore.dll`, [client.md](client.md) "Networking and the core DLL (M3)"); the server
+keeps ENet's defaults. A 60 s stall of the frame thread keeps the connection, and a client that stops
+servicing ENet is timed out (PlayerLeft reason 1), both in `kp-core-test` (*measured*).
 
 ## Changing the protocol
 

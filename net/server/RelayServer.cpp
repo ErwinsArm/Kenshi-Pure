@@ -1,5 +1,7 @@
 #include "RelayServer.h"
 
+#include <cstdio>
+
 #include <algorithm>
 #include <vector>
 
@@ -121,6 +123,15 @@ void RelayServer::onReceive(ENetPeer* peer, ENetPacket* packet, enet_uint8 chann
         p.hasPose = true;
         p.poseAt = Clock::now();
         ++stats_.posesAccepted;
+        if (cfg_.poseLogEvery.count() > 0 && (!p.poseLogged || p.poseAt - p.poseLoggedAt >= cfg_.poseLogEvery)) {
+            p.poseLogged = true;
+            p.poseLoggedAt = p.poseAt;
+            char line[200];
+            std::snprintf(line, sizeof(line), "pose: player %u (%s) pos %.1f %.1f %.1f yaw %.1f moving %d%s",
+                          p.id, p.name.c_str(), p.pose.pos[0], p.pose.pos[1], p.pose.pos[2], p.pose.yaw,
+                          (p.pose.flags & kFlagMoving) ? 1 : 0, (p.pose.flags & kFlagPaused) ? " paused" : "");
+            log(line);
+        }
         return;
     }
     reject(peer, p, RejectReason::Malformed);   // a server-to-client type

@@ -1,4 +1,5 @@
-# KenshiPure network code: protocol codec, relay server, test bot and their tests.
+# KenshiPure network code: protocol codec, relay server, test bot, the client core DLL
+# (KenshiPureCore.dll, loaded by the game plugin) and their tests.
 # Built by scripts/build-net.ps1 with the toolchain from scripts/setup-modern.ps1.
 cmake_minimum_required(VERSION 3.25)
 project(KenshiPureNet LANGUAGES C CXX)
@@ -36,6 +37,15 @@ add_executable(kp-server server/main.cpp)
 target_link_libraries(kp-server PRIVATE kp_net)
 add_executable(kp-bot bot/main.cpp)
 target_link_libraries(kp-bot PRIVATE kp_net)
+# The client core: modern C++ behind the plain C interface client/KpCore.h; static CRT, so the
+# plugin (VC++ 2010, Kenshi's MSVCR100) and the core share no runtime.
+set(KP_CORE_BUILD "0.0.4-m3" CACHE STRING "version string of KenshiPureCore.dll")
+add_library(KenshiPureCore SHARED core/Core.cpp)
+target_include_directories(KenshiPureCore PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../client)
+target_compile_definitions(KenshiPureCore PRIVATE KP_CORE_BUILD="${KP_CORE_BUILD}")
+target_link_libraries(KenshiPureCore PRIVATE kp_net)
+target_compile_options(KenshiPureCore PRIVATE /W4 /WX)
+
 foreach(t kp-server kp-bot)
   target_compile_options(${t} PRIVATE /W4 /WX)
 endforeach()
@@ -50,3 +60,13 @@ foreach(t kp-proto-test kp-loopback-test)
   add_test(NAME ${t} COMMAND ${t})
 endforeach()
 set_tests_properties(kp-loopback-test PROPERTIES TIMEOUT 60)
+
+# The core DLL through its C interface plus the plugin's frame side (client/NetFrame.cpp, the same
+# file the plugin compiles with VC++ 2010) against the real relay server; includes a 60 s stall.
+add_executable(kp-core-test test/CoreTest.cpp ../client/NetFrame.cpp)
+target_include_directories(kp-core-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../client)
+target_link_libraries(kp-core-test PRIVATE kp_net)
+target_compile_options(kp-core-test PRIVATE /W4 /WX)
+add_dependencies(kp-core-test KenshiPureCore)
+add_test(NAME kp-core-test COMMAND kp-core-test)
+set_tests_properties(kp-core-test PROPERTIES TIMEOUT 240)

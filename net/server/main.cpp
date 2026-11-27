@@ -1,5 +1,5 @@
 // kp-server: the KenshiPure relay server (console).
-//   kp-server [--port N] [--max-players N] [--local]
+//   kp-server [--port N] [--max-players N] [--local] [--log-poses]
 #include <atomic>
 #include <csignal>
 #include <cstdio>
@@ -24,10 +24,11 @@ void logLine(std::string_view s) {
 }
 
 int usage() {
-    std::printf("usage: kp-server [--port N] [--max-players N] [--local]\n"
+    std::printf("usage: kp-server [--port N] [--max-players N] [--local] [--log-poses]\n"
                 "  --port N         UDP port (default %u)\n"
                 "  --max-players N  1-%zu (default %zu)\n"
-                "  --local          accept only connections from this PC\n",
+                "  --local          accept only connections from this PC\n"
+                "  --log-poses      log each player's pose once a second\n",
                 kp::proto::kDefaultPort, kp::proto::kMaxPlayers, kp::proto::kMaxPlayers);
     return 2;
 }
@@ -41,6 +42,7 @@ int main(int argc, char** argv) {
         if (a == "--port") { long v = next(); if (v < 1 || v > 65535) return usage(); cfg.port = static_cast<std::uint16_t>(v); }
         else if (a == "--max-players") { long v = next(); if (v < 1 || v > static_cast<long>(kp::proto::kMaxPlayers)) return usage(); cfg.maxPlayers = static_cast<std::size_t>(v); }
         else if (a == "--local") cfg.loopbackOnly = true;
+        else if (a == "--log-poses") cfg.poseLogEvery = std::chrono::milliseconds(1000);
         else return usage();
     }
     cfg.log = logLine;

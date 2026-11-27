@@ -33,6 +33,7 @@ public:
     bool connect(const std::string& host, std::uint16_t port, const std::string& name,
                  std::uint16_t version = proto::kProtocolVersion);
     // Leaves on purpose (server reports PlayerLeft "left"); waits up to waitMs for the ack.
+    // waitMs <= 0: sends the disconnect at once without waiting (also while still connecting).
     void disconnect(int waitMs = 500);
 
     // Services the network for up to timeoutMs; appends what happened to out.

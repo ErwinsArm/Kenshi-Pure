@@ -24,6 +24,7 @@ namespace kp
         int walking;           // AK's rule: x/z distance^2 from pos to pathDest > 4
         int paused;
         unsigned long long tick;   // GetTickCount64() when sampled
+        unsigned int epoch;        // +1 whenever the local character changes or comes back after menu/loading
     };
 
     // Checks the rows M1 needs; logs and returns false when one is unresolved.

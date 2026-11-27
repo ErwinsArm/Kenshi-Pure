@@ -92,9 +92,11 @@ AK's decompile (REA/Ghidra) stays our guide for *where* to intervene for each pl
 (loading and movement speed, inventory, shops, the thread-local patch table) and how AK did it;
 each site we need is then rebuilt and proven in our own table.
 
-## Core split (step 6, for M2)
+## Core split (step 6, built at M3)
 
-Built when the first protocol code is written (M2); before that the core would be empty.
+Built at M3 as `KenshiPureCore.dll`. The built interface differs in detail from the sketch below (a
+table of C functions from `kpCoreGetApi`; a pose slot, an event queue and a remote-pose table instead
+of one tick call): [client.md](client.md) "Networking and the core DLL (M3)".
 - `KenshiPureCore.dll`, modern MSVC (v143), static CRT, no C++ types across its border; it never sees a
   game pointer. It holds protocol, sync state, prediction, and later the code shared with the server.
 - Interface (`client/KpCore.h`, plain C, versioned like `KpHost`): `kpCoreStart(const KpCoreHost*)` →

@@ -33,6 +33,8 @@ namespace
     enum Where { W_UNKNOWN, W_NONE, W_CHAR };
     Where g_where = W_UNKNOWN;
     Character* g_lastChar = NULL;
+    unsigned int g_epoch = 0;
+    unsigned long long g_lastSampleAt = 0;   // a gap > 2 s (load stall) starts a new epoch too
 
     __declspec(noinline) void CopyName(Character* c, char* out, size_t outSize)
     {
@@ -162,6 +164,8 @@ namespace kp
         if (!g_ready) return;
         unsigned long long now = GetTickCount64();
         if (!g_sampleRate.Due(now, KP_POSE_SAMPLE_MS)) return;
+        bool gap = g_lastSampleAt != 0 && now - g_lastSampleAt > 2000;
+        g_lastSampleAt = now;
 
         PoseSample s;
         memset(&s, 0, sizeof(s));
@@ -186,11 +190,13 @@ namespace kp
         s.tick = now;
         s.yawDeg = YawDegFromQuat(s.quat[0], s.quat[1], s.quat[2], s.quat[3]);
         s.walking = DistXZ2(s.pos, s.pathDest) > 4.0f ? 1 : 0;
-        if (g_where != W_CHAR || who != g_lastChar)
+        if (g_where != W_CHAR || who != g_lastChar || gap)
         {
             Log("pose: local character %s (%s, %u owned)", s.name, s.selected ? "selected" : "first owned", s.owned);
             g_haveLogged = false;
+            ++g_epoch;
         }
+        s.epoch = g_epoch;
         g_where = W_CHAR;
         g_lastChar = who;
         g_latest = s;

@@ -7,9 +7,12 @@
 #
 # KenshiPure starts as an Ogre plugin (KenshiPureLoader.dll), with or without RE_Kenshi.
 # What it touches, and nothing else:
-#   <game>\mods\KenshiPure\        KenshiPureLoader.dll, KenshiPure.dll (+ .pdb), and KenshiPure.cfg:
-#                                  with -ProbeWrite it holds probe_write=1 (the live game probe may heal,
-#                                  teleport and spawn items); without it, no cfg
+#   <game>\mods\KenshiPure\        KenshiPureLoader.dll, KenshiPure.dll (+ .pdb), KenshiPureCore.dll (the
+#                                  network core, from scripts\build-net.ps1), and KenshiPure.cfg: the
+#                                  network lines host=127.0.0.1, port=27850, name=player are added when
+#                                  missing (lines already there, e.g. another server, are kept);
+#                                  probe_write=1 is there only with -ProbeWrite (the live game probe may
+#                                  heal, teleport and spawn items)
 #   <game>\Plugins_x64.cfg         adds / removes "Plugin=mods/KenshiPure/KenshiPureLoader" (right after
 #                                  "Plugin=RE_Kenshi" if that is there, else before the first Plugin= line);
 #                                  removes / restores AnarchyKenshi's "Plugin=mods/AnarchyKenshi/AnarchyLoader";
@@ -23,12 +26,14 @@ param(
     [switch]$Uninstall,
     [switch]$ProbeWrite,  # allow the probe's write commands (heal, teleport, spawn_item)
     [string]$BuildDir = "",
+    [string]$CoreDir = "",   # where KenshiPureCore.dll is (default build\net\Release)
     [switch]$NoGameCheck  # for tests only: skip the "Kenshi is running" check
 )
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib\CfgEdit.ps1")
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if (-not $BuildDir) { $BuildDir = Join-Path $RepoRoot "build\client" }
+if (-not $CoreDir) { $CoreDir = Join-Path $RepoRoot "build\net\Release" }
 
 $AkLine      = "Plugin=mods/AnarchyKenshi/AnarchyLoader"
 $ReKenshi    = "Plugin=RE_Kenshi"
@@ -41,7 +46,8 @@ $modDir      = Join-Path $GameDir "mods\KenshiPure"
 $stateFile   = Join-Path $modDir "install-state.json"
 $Dlls        = @("KenshiPureLoader.dll", "KenshiPure.dll")
 # Files of this and older KenshiPure installs (RE_Kenshi.json and KenshiPure.mod: the RE_Kenshi start).
-$OurFiles    = @("KenshiPureLoader.dll", "KenshiPureLoader.pdb", "KenshiPure.dll", "KenshiPure.pdb", "KenshiPure.mod",
+$CoreDll     = "KenshiPureCore.dll"
+$OurFiles    = @("KenshiPureLoader.dll", "KenshiPureLoader.pdb", "KenshiPure.dll", "KenshiPure.pdb", $CoreDll, "KenshiPure.mod",
                  "RE_Kenshi.json", "KenshiPure.cfg", "install-state.json")
 
 foreach ($f in @($pluginsCfg, $modsCfg)) {
@@ -72,6 +78,7 @@ if (-not $Uninstall) {
     foreach ($d in $Dlls) {
         if (-not (Test-Path -LiteralPath (Join-Path $BuildDir $d))) { throw "Not built: $(Join-Path $BuildDir $d). Run scripts\build-plugin.ps1 first." }
     }
+    if (-not (Test-Path -LiteralPath (Join-Path $CoreDir $CoreDll))) { throw "Not built: $(Join-Path $CoreDir $CoreDll). Run scripts\build-net.ps1 first." }
     $state = Read-State
     Backup-Once $pluginsCfg $BackupSfx | Out-Null
 
@@ -81,13 +88,20 @@ if (-not $Uninstall) {
         $pdb = [IO.Path]::ChangeExtension((Join-Path $BuildDir $d), ".pdb")
         if (Test-Path -LiteralPath $pdb) { Copy-Item -LiteralPath $pdb -Destination $modDir -Force }
     }
+    Copy-Item -LiteralPath (Join-Path $CoreDir $CoreDll) -Destination (Join-Path $modDir $CoreDll) -Force
     foreach ($old in @("RE_Kenshi.json", "KenshiPure.mod")) {
         $p = Join-Path $modDir $old
         if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
     }
+    # KenshiPure.cfg: keep every line except probe_write, which follows -ProbeWrite; add missing network lines.
     $cfg = Join-Path $modDir "KenshiPure.cfg"
-    if ($ProbeWrite) { Set-Content -LiteralPath $cfg -Value "probe_write=1" -Encoding ASCII }
-    elseif (Test-Path -LiteralPath $cfg) { Remove-Item -LiteralPath $cfg -Force }
+    $lines = @()
+    if (Test-Path -LiteralPath $cfg) { $lines = @(Get-Content -LiteralPath $cfg | Where-Object { $_ -notmatch '^\s*probe_write\s*=' }) }
+    foreach ($kv in @(@("host", "127.0.0.1"), @("port", "27850"), @("name", "player"))) {
+        if (-not ($lines | Where-Object { $_ -match "^\s*$($kv[0])\s*=" })) { $lines += "$($kv[0])=$($kv[1])" }
+    }
+    if ($ProbeWrite) { $lines += "probe_write=1" }
+    Set-Content -LiteralPath $cfg -Value $lines -Encoding ASCII
     Remove-OldModLine
 
     $plugins = Read-CfgFile $pluginsCfg
@@ -114,6 +128,7 @@ if (-not $Uninstall) {
     Write-Host ("RE_Kenshi: " + $(if ((Find-CfgLine $plugins.Lines $ReKenshi) -ge 0) { "on (KenshiPure loads right after it)" } else { "not on (not needed)" }))
     Write-Host ("AnarchyKenshi: " + $(if ($state.removedAnarchyLine) { "switched off (uninstall switches it back on)" } else { "was not on" }))
     Write-Host ("Live probe write commands: " + $(if ($ProbeWrite) { "ON (heal, teleport, spawn_item)" } else { "off" }))
+    Write-Host ("Network (KenshiPure.cfg): " + (@($lines | Where-Object { $_ -match '^\s*(host|port|name)\s*=' }) -join ", "))
     Write-Host "Logs after a game start: $(Join-Path $modDir 'KenshiPureLoader.log') and KenshiPure.log"
 }
 else {

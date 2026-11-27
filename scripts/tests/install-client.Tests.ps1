@@ -14,7 +14,7 @@ function New-FakeGame([string]$Root, [bool]$WithAnarchy = $true, [bool]$WithReKe
     [IO.File]::WriteAllText((Join-Path $Root "data\mods.cfg"), "AnarchyKenshi.mod`r`nMinimal UI.mod`r`nShops regenerate .mod`r`n", [Text.Encoding]::ASCII)
     $build = Join-Path $Root "fake-build"
     New-Item -ItemType Directory -Force $build | Out-Null
-    foreach ($d in @("KenshiPureLoader.dll", "KenshiPure.dll")) { [IO.File]::WriteAllBytes((Join-Path $build $d), [byte[]](1, 2, 3)) }
+    foreach ($d in @("KenshiPureLoader.dll", "KenshiPure.dll", "KenshiPureCore.dll")) { [IO.File]::WriteAllBytes((Join-Path $build $d), [byte[]](1, 2, 3)) }
     return $build
 }
 
@@ -27,19 +27,21 @@ Describe "install-client.ps1" {
         $plugins0 = Get-Bytes "$g\Plugins_x64.cfg"
         $mods0 = Get-Bytes "$g\data\mods.cfg"
 
-        & $script -GameDir $g -BuildDir $build -NoGameCheck | Out-Null
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
         $p = [IO.File]::ReadAllText("$g\Plugins_x64.cfg")
         $p | Should Not Match "AnarchyLoader"
         $p | Should Match "Plugin=RE_Kenshi`r`nPlugin=mods/KenshiPure/KenshiPureLoader`r`nPlugin=RenderSystem_Direct3D11_x64`r`n"
         Get-Bytes "$g\data\mods.cfg" | Should Be $mods0
         Test-Path "$g\mods\KenshiPure\KenshiPure.dll" | Should Be $true
         Test-Path "$g\mods\KenshiPure\KenshiPureLoader.dll" | Should Be $true
+        Test-Path "$g\mods\KenshiPure\KenshiPureCore.dll" | Should Be $true
+        [IO.File]::ReadAllText("$g\mods\KenshiPure\KenshiPure.cfg") | Should Be "host=127.0.0.1`r`nport=27850`r`nname=player`r`n"
         Test-Path "$g\mods\KenshiPure\RE_Kenshi.json" | Should Be $false
         Get-Bytes "$g\Plugins_x64.cfg.kenshipure-backup" | Should Be $plugins0
         [IO.File]::ReadAllText("$g\Plugins_x64.cfg.before-anarchy") | Should Be "old backup"
 
         # Installing twice changes nothing more and still remembers AnarchyKenshi was on.
-        & $script -GameDir $g -BuildDir $build -NoGameCheck | Out-Null
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
         ([IO.File]::ReadAllText("$g\Plugins_x64.cfg") -split "KenshiPureLoader").Count | Should Be 2
 
         & $script -GameDir $g -Uninstall -NoGameCheck | Out-Null
@@ -53,7 +55,7 @@ Describe "install-client.ps1" {
         $g = Join-Path $TestDrive "g4"
         $build = New-FakeGame $g $false $false
         $plugins0 = Get-Bytes "$g\Plugins_x64.cfg"
-        & $script -GameDir $g -BuildDir $build -NoGameCheck | Out-Null
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
         [IO.File]::ReadAllText("$g\Plugins_x64.cfg") | Should Match "# Define plugins`r`nPlugin=mods/KenshiPure/KenshiPureLoader`r`nPlugin=RenderSystem_Direct3D11_x64`r`n"
         & $script -GameDir $g -Uninstall -NoGameCheck | Out-Null
         Get-Bytes "$g\Plugins_x64.cfg" | Should Be $plugins0
@@ -67,7 +69,7 @@ Describe "install-client.ps1" {
         New-Item -ItemType Directory -Force "$g\mods\KenshiPure" | Out-Null
         Set-Content "$g\mods\KenshiPure\RE_Kenshi.json" "{}"
         Set-Content "$g\mods\KenshiPure\KenshiPure.mod" "x"
-        & $script -GameDir $g -BuildDir $build -NoGameCheck | Out-Null
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
         Get-Bytes "$g\data\mods.cfg" | Should Be $mods0
         Test-Path "$g\mods\KenshiPure\RE_Kenshi.json" | Should Be $false
         Test-Path "$g\mods\KenshiPure\KenshiPure.mod" | Should Be $false
@@ -77,7 +79,7 @@ Describe "install-client.ps1" {
         $g = Join-Path $TestDrive "g2"
         $build = New-FakeGame $g $false
         $plugins0 = Get-Bytes "$g\Plugins_x64.cfg"
-        & $script -GameDir $g -BuildDir $build -NoGameCheck | Out-Null
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
         & $script -GameDir $g -Uninstall -NoGameCheck | Out-Null
         Get-Bytes "$g\Plugins_x64.cfg" | Should Be $plugins0
     }
@@ -85,13 +87,33 @@ Describe "install-client.ps1" {
     It "keeps the first backup and the logs" {
         $g = Join-Path $TestDrive "g3"
         $build = New-FakeGame $g
-        & $script -GameDir $g -BuildDir $build -NoGameCheck | Out-Null
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
         $backup = Get-Bytes "$g\Plugins_x64.cfg.kenshipure-backup"
         Set-Content "$g\mods\KenshiPure\KenshiPure.log" "a run"
         & $script -GameDir $g -Uninstall -NoGameCheck | Out-Null
-        & $script -GameDir $g -BuildDir $build -NoGameCheck | Out-Null
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
         Get-Bytes "$g\Plugins_x64.cfg.kenshipure-backup" | Should Be $backup
         Test-Path "$g\mods\KenshiPure\KenshiPure.log" | Should Be $true
+    }
+
+    It "keeps the user's network lines and switches probe_write with -ProbeWrite" {
+        $g = Join-Path $TestDrive "g6"
+        $build = New-FakeGame $g
+        New-Item -ItemType Directory -Force "$g\mods\KenshiPure" | Out-Null
+        [IO.File]::WriteAllText("$g\mods\KenshiPure\KenshiPure.cfg", "host=100.64.0.7`r`nname=Gecko`r`nprobe_write=1`r`n", [Text.Encoding]::ASCII)
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
+        [IO.File]::ReadAllText("$g\mods\KenshiPure\KenshiPure.cfg") | Should Be "host=100.64.0.7`r`nname=Gecko`r`nport=27850`r`n"
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -ProbeWrite -NoGameCheck | Out-Null
+        [IO.File]::ReadAllText("$g\mods\KenshiPure\KenshiPure.cfg") | Should Be "host=100.64.0.7`r`nname=Gecko`r`nport=27850`r`nprobe_write=1`r`n"
+        & $script -GameDir $g -Uninstall -NoGameCheck | Out-Null
+        Test-Path "$g\mods\KenshiPure\KenshiPureCore.dll" | Should Be $false
+    }
+
+    It "refuses to install without the core DLL" {
+        $g = Join-Path $TestDrive "g7"
+        $build = New-FakeGame $g
+        Remove-Item "$build\KenshiPureCore.dll"
+        { & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck } | Should Throw
     }
 
     It "refuses a folder that is not a Kenshi install" {

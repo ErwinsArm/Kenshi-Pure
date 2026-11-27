@@ -116,6 +116,72 @@ facing, 0 standing); no fault.
 - Log: once a second `pose: <name> pos … yaw … facing … motion … speed … want … moving … walking … dest …
   path … step/s …`; `step/s` is the x/z distance between two logged samples per real second. Non-finite
   or huge values (> 1e7) skip the sample (logged at most every 10 s).
+- Each sample carries an `epoch` that goes up when the local character changes, comes back after
+  "no own character", or after a gap of more than 2 s between samples (a load stall); the network
+  side uses it to drop half-set-up samples.
+
+# Client: networking and the core DLL (M3)
+
+Status: built and tested without the game (below); the in-game run by the user is pending.
+
+**Pieces**
+- `KenshiPureCore.dll` (`net/core/Core.cpp`): MSVC 14.44, C++20, static CRT, built by
+  `scripts/build-net.ps1` (which checks it exports only `kpCoreGetApi` and imports no C runtime DLL).
+  It holds the protocol codec (`net/proto`) and `NetClient` (`net/client`) and never sees a game pointer.
+- Interface `client/KpCore.h` (version 1): plain C, POD only. `kpCoreGetApi(version)` returns a table:
+  `start(config)` → core (starts the network thread; no `DllMain`, no thread before `start`), `stop`,
+  `setLocalPose`, `takeEvents`, `takeRemotePoses`, `status`. Every call takes the core's mutex only
+  for a copy; the mutex is never held across ENet calls or the log callback.
+- `client/NetFrame.{h,cpp}`: the frame-thread side, compiled by **both** VC++ 2010 (into
+  KenshiPure.dll) and MSVC 14.44 (into the test), so the test runs the plugin's own code. It reaches the
+  game only through `IGameAccess` (local pose, log; spawn/move/remove are stubs for M4/M5).
+- `client/Net.cpp`: the game adapter. Reads `KenshiPure.cfg`, loads the core from the plugin folder
+  (`LoadLibraryExW` with the full path from `PluginDir()`), runs `NetFrame` each frame after
+  `PoseOnFrame`. Any problem (no `host=` line, no core DLL, other core version, bad config) logs
+  `net: off (...)` and leaves the rest of the plugin as it was.
+
+**Config** `<Kenshi>\mods\KenshiPure\KenshiPure.cfg` (key=value, `#` comments): `host` (no line or empty
+= networking off), `port` (default 27850), `name` (default `player`; 1–32 bytes, no control
+characters, else off). `install-client.ps1` adds `host=127.0.0.1`, `port=27850`, `name=player` when
+missing and keeps lines already there (another server, another name).
+
+**Threads**
+- The network thread (priority above normal) is the only one touching ENet. It services ENet every
+  ≤ 2 ms, connects, sends Hello, and while welcomed sends each new local pose once.
+- States: waiting → connecting (deadline 10 s for Welcome) → welcomed. A failed attempt backs off 1,
+  2, 4 … 30 s; a refusal (Reject) waits 60 s; a lost connection retries after 1 s. The first failure
+  of a row is logged, then one summary line a minute; a loss or a refusal is always logged. A failed
+  attempt disconnects at once (`enet_peer_disconnect_now`), so the server keeps no ghost peer.
+- The frame thread: each frame `NetFrame` takes the latest sample (Pose.cpp samples at 10 Hz) and
+  hands each new one to the core. After an epoch change it drops the first sample, then samples whose
+  destination is 0/0/0, for at most 2 s (then sends anyway and says so). Non-finite values (e.g. a
+  yaw without heading) are dropped. No pose while there is no own character: the server keeps the last
+  one and its age grows. Velocity = `currentMotion`, moving = `currentlyMoving`, paused = `isPaused`.
+- Each frame it drains events (join and leave logged) and the remote poses (latest per announced
+  player, at most 64), each player's pose logged at most once a second:
+  `net: remote <name> (<id>) pos … vel … yaw … moving … age … ms`.
+- Exit: the loader's `dllStopPlugin` calls KenshiPure's `kpStop` (leave + stop, at most 2 s; the
+  thread is left to the process exit if it hangs). Whether Kenshi calls `dllStopPlugin` at all is
+  **not** seen: no earlier `KenshiPureLoader.log` holds its line (**M**, 2 logs). Without it the
+  server reports the player as timed out after ENet's 5–30 s.
+
+**Load stalls (plan G14)**: the game's frame thread blocks ~60 s while loading; the network thread
+keeps servicing ENet meanwhile, so neither side's ENet timeout (5–30 s, protocol-ours.md "Timeouts")
+is reached. Shown without the game (**M**, `kp-core-test`), not yet in game.
+
+**Test** `net/test/CoreTest.cpp` (`kp-core-test`, CTest, ~62 s; **M**, passes on this PC, 52 checks):
+the core DLL loaded by `LoadLibrary` through its C table, `NetFrame` with a fake game, the real
+`RelayServer` and an observer bot each on their own thread. Checks: bad configs refused, cfg parsing;
+half-set-up samples never reach the observer; poses both ways; a 60 s sleep of the frame thread keeps
+the same player id and no leave, the observer sees our pose's age reach ~60 s, then fresh again,
+while an unserviced client beside it is timed out by the server (so ENet's timeout is real); a core
+aimed at a closed port fails and retries; server gone → "connection lost" → reconnect with a new
+id; stop leaves on purpose (server logs "left") in a few ms.
+
+**In-game check (user)**: `kp-server --log-poses` and `kp-bot` on this PC, Kenshi with KenshiPure;
+expected: `KenshiPure.log` shows `net: welcomed`, `net: remote bot …` with the bot's circle; the
+server log shows `pose: player … (player)` following the walk; a save load shows no
+`connection lost`.
 
 # Client: live game probe
 

@@ -20,6 +20,7 @@ struct ServerConfig {
     std::uint16_t rateHz = 10;
     std::chrono::milliseconds helloTimeout{5000};
     std::function<void(std::string_view)> log;  // optional
+    std::chrono::milliseconds poseLogEvery{0};  // > 0: log each player's pose at most this often
 };
 
 struct ServerStats {
@@ -56,6 +57,8 @@ private:
         std::uint32_t seq = 0;
         proto::Pose pose;
         Clock::time_point poseAt;   // when the latest pose arrived
+        Clock::time_point poseLoggedAt;
+        bool poseLogged = false;
     };
 
     void onConnect(ENetPeer* peer);

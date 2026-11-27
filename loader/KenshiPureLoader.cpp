@@ -17,7 +17,7 @@
 #include "Display.h"
 #include "DxgiFix.h"
 
-#define KPL_VERSION "0.0.2-m0b"
+#define KPL_VERSION "0.0.3-m3"
 
 namespace
 {
@@ -25,6 +25,7 @@ namespace
     wchar_t g_exe[MAX_PATH] = L"";
     char g_build[160] = "";
     KpHost g_host;
+    HMODULE g_kpDll = NULL;   // KenshiPure.dll, pinned once started
 
     bool Sha256File(const wchar_t* path, char out[65], unsigned long long* size)
     {
@@ -153,6 +154,7 @@ namespace
         g_host.exeSha256 = g_sha;
         g_host.exePath = g_exe;
         g_host.displayHook = displayHook;
+        g_kpDll = kpDll;
         int active = start(&g_host);
         kp::Log("loader: KenshiPure.dll started (%s); see KenshiPure.log", active ? "active" : "inactive");
     }
@@ -170,4 +172,11 @@ extern "C" __declspec(dllexport) void dllStartPlugin()
 extern "C" __declspec(dllexport) void dllStopPlugin()
 {
     kp::Log("loader: Ogre unloads its plugins (game is closing)");
+    // KenshiPure.dll is pinned (never unloaded), so its kpStop is still there; older builds have none.
+    if (g_kpDll)
+    {
+        typedef void (*KpStopFn)();
+        KpStopFn stop = (KpStopFn)GetProcAddress(g_kpDll, "kpStop");
+        if (stop) stop();
+    }
 }
