@@ -163,14 +163,19 @@ Server-feature strings: "AnarchyKenshi server - " (`0x11a6ef0` area), "browser: 
 
 ## 5. Display fix (full screen in the wrong resolution)
 
-Known from log strings only (**M** for the strings, **I** for what the code does; not decompiled).
-Explains why plain Kenshi can start full screen stretched from a smaller mode until Alt+Enter, and
-AK does not.
-- Hooks `IDXGIFactory::CreateSwapChain` so a full-screen request uses the monitor's own mode,
-  not a scaled one (string RVA `0x127db80`); also hooks `IDXGISwapChain::ResizeTarget`
-  (`0x127d9b0`).
-- Minimizes and restores the game window 0.7 s after start (`0x127dcd0`, `0x127dd68`), which
-  does what Alt+Enter does by hand (**I**).
+Known from log strings and AK's own log of a run on the user's PC (v0.136.1, RE_Kenshi's 1.0.65
+exe); not decompiled. Explains why plain Kenshi can start full screen stretched from a smaller mode
+until Alt+Enter, and AK does not.
+- Cause (**M**, AK log): Kenshi (Ogre D3D11) creates its swap chain as "1920x1080 @ 0/0 format 28
+  scaling STRETCHED, windowed"; AK's log: "scaling set to UNSPECIFIED (with it DXGI picks a smaller
+  scaled mode)". Hook on `IDXGIFactory::CreateSwapChain` (string RVA `0x127db80`) rewrites
+  `BufferDesc.Scaling`; also hooks `IDXGISwapChain::ResizeTarget` (`0x127d9b0`).
+- Timing (**M**, AK log): hook installed 2.3 s after AK's first log line; the game's
+  `CreateSwapChain` call came 0.16 s after that. So an Ogre plugin from `Plugins_x64.cfg` is early
+  enough; RE_Kenshi post-load plugins are not.
+- About 5 s later it compares window, client, monitor and picture size; all 1920x1080 → "nothing to
+  do". Only on a mismatch it minimizes and restores the window (0.7 s, `0x127dcd0`, `0x127dd68`) (**I**
+  from the strings).
 - Guards `SetCursorPos`: the game moves the cursor only while its window is in front (`0x127da10`).
 - Reads `Full Screen=` from `kenshi.cfg`; update function name string `DisplayFixUpdate`.
 

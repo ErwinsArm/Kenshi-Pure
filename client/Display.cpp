@@ -131,6 +131,26 @@ namespace
         if (good < 3) { LogState(w, "the game window never came to the front - no minimize-restore"); return 0; }
 
         LogState(w, "before");
+        RECT cr = { 0 };
+        GetClientRect(w, &cr);
+        // Target: the desktop mode saved in Windows (registry), not the current one - in exclusive full
+        // screen the current mode is whatever smaller mode the game got.
+        MONITORINFOEXW mi;
+        mi.cbSize = sizeof(mi);
+        DEVMODEW dm;
+        ZeroMemory(&dm, sizeof(dm));
+        dm.dmSize = sizeof(dm);
+        if (GetMonitorInfoW(MonitorFromWindow(w, MONITOR_DEFAULTTONEAREST), &mi) &&
+            EnumDisplaySettingsW(mi.szDevice, ENUM_REGISTRY_SETTINGS, &dm))
+        {
+            if ((DWORD)cr.right == dm.dmPelsWidth && (DWORD)cr.bottom == dm.dmPelsHeight)
+            {
+                kp::Log("display: client area %ldx%ld matches the desktop mode - nothing to do", cr.right, cr.bottom);
+                return 0;
+            }
+            kp::Log("display: client area %ldx%ld, desktop mode %lux%lu - minimize-restore", cr.right, cr.bottom,
+                    dm.dmPelsWidth, dm.dmPelsHeight);
+        }
         ShowWindowAsync(w, SW_MINIMIZE);
         kp::Log("display: minimized, restoring in 0.7 s");
         Sleep(700);

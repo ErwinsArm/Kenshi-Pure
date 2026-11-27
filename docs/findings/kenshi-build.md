@@ -22,7 +22,10 @@ running game is the 1.0.65 copy:
 
 Consequence: the Steam RVAs in [kenshi-sites.tsv](kenshi-sites.tsv) and [hooks.md](hooks.md) are
 for the 1.0.68 exe (`a596…`) and do **not** apply to the game as the user runs it. Our plugin finds
-Kenshi code through KenshiLib (below), which maps addresses for 1.0.65 and 1.0.68, Steam and GOG.
+Kenshi code through KenshiLib (below), which knows only the 1.0.65 exes, Steam and GOG (MD5 map in
+`Source/kenshi/Kenshi.cpp`, RVA files `Steam_1.0.65.br` / `GOG_1.0.65.br`, **M**). RE_Kenshi supports
+a 1.0.68 install by making a 1.0.65-compatible exe in `RE_Kenshi\` (**D**, RE_Kenshi README); no
+KenshiLib release up to v0.5.1 mentions 1.0.68 (**D**, GitHub releases).
 
 ## RE_Kenshi plugins
 
