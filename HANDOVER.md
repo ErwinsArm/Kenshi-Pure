@@ -20,7 +20,7 @@ State: the M5 code is NOT committed yet (uncommitted files in this folder: see `
   AnimationClass::setMaximumSpeed (+0x19C) -> AbstractMovementBase::maxSpeed (+0xB4); getEmptyFaction = "nofac";
   template 0 = "random character base-copy".
 - Disassembly helpers were scratch scripts outside the repo (iced-x86 via `scripts/lib/x64.mjs` + KenshiLib map via `scripts/lib/kenshilib.mjs`); rebuild them if needed.
-- `client/sites.tsv`: 13 new rows added and proven (feature `optional:remote-write`, plus `SaveManager::save` in `optional:autoload`).
+- `client/sites.tsv`: 15 new rows, all proven in both exes (feature `optional:remote-write`; `SaveManager::save` in `optional:autoload`).
 - Critics done (builder full, skeptic quick). Skeptic: saves may keep bodies (test autosave, try permanent=0), nofac relations unknown (log faction and down state), the speed raise must be checked in game.
 - Pure lifecycle `client/Remote.{h,cpp}` (`RemoteBodies`), wired into `client/NetFrame.{h,cpp}` (IGameAccess Remote* methods); `client/Drive.h` BodyState.down.
 - Builder critic (full) done; accepted: a 2 s stall also bumps the world epoch, so bodies are now VERIFIED by hand
