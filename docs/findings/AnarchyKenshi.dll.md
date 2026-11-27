@@ -161,6 +161,19 @@ Server-feature strings: "AnarchyKenshi server - " (`0x11a6ef0` area), "browser: 
   (`load`, `buildnav regen`, `passwd` with a password). Events are also written to
   `<name>-player-events.tsv`. **M**
 
+## 5. Display fix (full screen in the wrong resolution)
+
+Known from log strings only (**M** for the strings, **I** for what the code does; not decompiled).
+Explains why plain Kenshi can start full screen stretched from a smaller mode until Alt+Enter, and
+AK does not.
+- Hooks `IDXGIFactory::CreateSwapChain` so a full-screen request uses the monitor's own mode,
+  not a scaled one (string RVA `0x127db80`); also hooks `IDXGISwapChain::ResizeTarget`
+  (`0x127d9b0`).
+- Minimizes and restores the game window 0.7 s after start (`0x127dcd0`, `0x127dd68`), which
+  does what Alt+Enter does by hand (**I**).
+- Guards `SetCursorPos`: the game moves the cursor only while its window is in front (`0x127da10`).
+- Reads `Full Screen=` from `kenshi.cfg`; update function name string `DisplayFixUpdate`.
+
 ## Open questions
 
 - Full `0x4e3d0` config reader (decompile timed out): cfg key names ↔ struct offsets, defaults
