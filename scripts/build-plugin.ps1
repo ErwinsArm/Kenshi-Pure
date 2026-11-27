@@ -3,7 +3,8 @@
 #   1. client\sites.tsv changed since its last proof -> scripts\sites.mjs check re-proves every row in
 #      both Kenshi exes (needs the game folder; -GameDir, else KENSHI_DIR, else Steam's default).
 #   2. scripts\check-fields.mjs: no raw access to game fields (only KP_FIELD).
-#   3. scripts\sites.mjs gen -> build\client\gen\ (table, field ids, ml64 jump slots), compile, link.
+#   3. scripts\sites.mjs gen -> build\client\gen\ (table, field ids, ml64 jump slots), compile, link;
+#      build\client\pose-math-test.exe runs the unit tests of client\PoseMath.h (no game needed).
 #   4. Both DLLs import Kenshi's C runtime (MSVCR100.dll) and nothing newer, not KenshiLib.dll;
 #      KenshiPure.dll exports kpStart (not RE_Kenshi's startPlugin), the loader dllStartPlugin/dllStopPlugin.
 #   5. build\client\sites-test.exe runs the run-time resolver (client\Sites.cpp) on both exe files
@@ -89,6 +90,13 @@ $testObjs = Invoke-Compile "sites-test" @((Join-Path $src "test\SitesTest.cpp"),
 $testExe = Join-Path $out "sites-test.exe"
 Invoke-Link $testExe ($testObjs + $thunks) @("user32.lib") @("/SUBSYSTEM:CONSOLE")
 
+# Unit tests of the pure pose helpers (client\PoseMath.h), no game needed.
+$poseObjs = Invoke-Compile "pose-math-test" @((Join-Path $src "test\PoseMathTest.cpp")) @("/EHsc")
+$poseExe = Join-Path $out "pose-math-test.exe"
+Invoke-Link $poseExe $poseObjs @() @("/SUBSYSTEM:CONSOLE")
+& $poseExe
+if ($LASTEXITCODE -ne 0) { Stop-ToolchainHelpers; throw "pose-math-test failed" }
+
 # 4. Checks on the results.
 function Get-Dump([string]$file, [string]$what) { return (& $Tc.Dumpbin /nologo $what $file) -join "`n" }
 $problems = @()
@@ -119,4 +127,4 @@ foreach ($f in @($dll, $loader)) {
     Write-Host "Built $f"
     Write-Host "  sha256 $((Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLower())"
 }
-Write-Host "Checks: sites.tsv proven, no raw game fields, MSVCR100.dll only, no KenshiLib.dll, entry points exported, resolver test"
+Write-Host "Checks: sites.tsv proven, no raw game fields, MSVCR100.dll only, no KenshiLib.dll, entry points exported, pose math tests, resolver test"

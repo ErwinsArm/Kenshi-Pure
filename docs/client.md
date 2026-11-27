@@ -79,6 +79,34 @@ may already have hooked a function in memory, and the file's SHA-256 names the b
 - Writes: `sites.mjs gen` refuses a row of a `-write` feature that is not proven in every build.
 - Hooks: `client/Hooks.cpp`, one MinHook detour per function, listeners behind it (`OnFrame`).
 
+# Client: own pose (M1)
+
+Source: `client/Pose.cpp`, pure helpers `client/PoseMath.h` (unit tests `client/test/PoseMathTest.cpp`,
+run by `build-plugin.ps1`). Built and installed; **not yet run in game**.
+
+- Every 100 ms on the frame thread (after the game's frame): the local character is the player's
+  selected character if it is one of `PlayerInterface::playerCharacters`, else the first of them; none
+  (menu, loading) → `pose: no own character`. A change of character gets its own log line.
+- Read (all in `__try`, plain copies; rows of feature `optional:pose` plus the probe's
+  `selectedCharacter`, `hand::getCharacter`, `Character::getMovement`, `getName`/`getPosition` vslots;
+  any unresolved → `pose: off`):
+
+| Value | Source | How known |
+|---|---|---|
+| position | virtual `Character::getPosition()` | probe runs (**M**) |
+| orientation | virtual `RootObject::getOrientation()` (slot 0xC0, not overridden in Character's vtable) | its body copies 4 floats at `this+0xB0..0xBC` into the out-quaternion (**M**, 1.0.65 disassembly); that they are the body's rotation is **I** |
+| yaw | rotated +Z axis of the quaternion, `atan2(2(xz+wy), 1-2(x²+y²))`, degrees; 0 = +z, 90 = +x | AK's formula (protocol.md, **M**); tests |
+| facing, motion, speed, wanted speed, moving, destination, path destination | `AbstractMovementBase` fields `direction` 0xD0, `currentMotion` 0xA8, `currentSpeed` 0xB8, `desiredSpeed` 0xBC, `currentlyMoving` 0x24, `destination` 0xDC, `pathDestination` 0xE8, through `Character::getMovement()` | offsets proven in both builds (sites.tsv); meanings and units are KenshiLib's names (**I**) |
+| walking | x/z distance² from position to path destination > 4 | AK's rule (+0xE8 is AK's "destination", **M**) |
+| step/s | x/z distance between two logged samples per real second | our own cross-check for the velocity unit |
+
+- Log: once a second `pose: <name> pos … yaw … facing … motion … speed … want … moving … walking … dest …
+  path … step/s …` (`paused` appended while paused). Non-finite or huge values (> 1e7) skip the sample
+  (logged at most every 10 s).
+- Open until the run: which field is the velocity and in what unit (compare `motion`/`speed` with
+  `step/s`), whether `facing` and yaw agree, and whether `destination` or `pathDestination` follows a
+  move order.
+
 # Client: live game probe
 
 Source: `client/Probe.cpp`, `client/Probe.h`; MCP side: `mcp/kenshi-probe.mjs`. Setup: `docs/setup.md`.

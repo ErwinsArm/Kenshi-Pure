@@ -1,4 +1,4 @@
-// KenshiPure client plugin: build check, address layer, per-frame hook, live probe.
+// KenshiPure client plugin: build check, address layer, per-frame hook, own pose (M1), live probe.
 // Started by KenshiPureLoader.dll (an Ogre plugin) through kpStart (KpHost.h). Built with KenshiLib
 // 0.5.0's headers (declarations only; KenshiLib is not linked or loaded) and the VC++ 2010 (v100)
 // x64 toolset, /MD, so every C++ object crossing into Kenshi has Kenshi's own layout and heap.
@@ -15,8 +15,9 @@
 #include "Log.h"
 #include "Display.h"
 #include "Probe.h"
+#include "Pose.h"
 
-#define KP_VERSION "0.0.2-m0b"
+#define KP_VERSION "0.0.3-m1"
 
 namespace
 {
@@ -175,6 +176,7 @@ namespace
             g_lastLine = now;
             AbiProof(gw);
         }
+        if (g_abi != ABI_FAIL) kp::PoseOnFrame(gw);
         if (g_abi != ABI_FAIL && kp::FeatureOn("optional:probe")) kp::ProbeOnFrame(gw, g_frames, g_frameThread);
     }
 
@@ -225,6 +227,7 @@ extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
         return 0;
     }
     kp::Log("frame: hook installed; waiting for the first frame");
+    kp::PoseInit();
     if (kp::FeatureOn("optional:probe")) kp::ProbeStart();
     else kp::Log("probe: off (its addresses are not all resolved for this build)");
     return 1;
