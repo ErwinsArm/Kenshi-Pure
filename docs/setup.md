@@ -73,7 +73,9 @@ Edit the URL and SHA-256 together in `scripts\setup-rea.ps1` (official checksum 
 
 Needs git, Windows 10/11 x64, about 2.5 GB free while setting up (1.7 GB afterwards). Nothing is
 installed into Windows: the VC++ 2010 compiler is unpacked from Microsoft's Windows SDK 7.1 ISO into
-`tools\build\` (gitignored), with KenshiLib 0.5.0 and Boost 1.60 headers, all pinned by SHA-256.
+`tools\build\` (gitignored), with KenshiLib 0.5.0 headers and address map, Boost 1.60 headers,
+MinHook 1.3.4 sources and the iced-x86 1.22.0 decoder, all pinned by SHA-256 (KenshiLib's headers by
+git commit). The build also needs Node (the portable one from `scripts\setup-rea.ps1`, or Node on PATH).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\setup-build.ps1

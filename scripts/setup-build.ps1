@@ -2,9 +2,13 @@
 #   - VC++ 2010 (v100) x64 compiler + CRT and Windows SDK 7.1 headers/libs, unpacked from
 #     Microsoft's Windows SDK 7.1 ISO with "msiexec /a" (an administrative image: files only,
 #     nothing is installed or registered in Windows).
-#   - KenshiLib 0.5.0 (the version RE_Kenshi 0.3.5 ships): release zip for KenshiLib.lib, git tag
-#     for the headers (pinned by commit).
+#   - KenshiLib 0.5.0 (the version RE_Kenshi 0.3.5 ships): release zip for its 1.0.65 address map
+#     (RE_Kenshi\RVAs\*.br, read by scripts\sites.mjs), git tag for the headers (pinned by commit).
+#     Our DLLs do not link or load KenshiLib; they use its headers for declarations only.
 #   - Boost 1.60.0 headers (KenshiLib's headers need them).
+#   - MinHook 1.3.4 (upstream sources, compiled into our DLLs behind our own hook dispatcher).
+#   - iced-x86 1.22.0 (npm tarball: an x64 decoder in WebAssembly; scripts\sites.mjs masks the
+#     operands of our byte patterns with it). No npm install, no other packages.
 # Every download is checked against a pinned SHA-256. Re-running skips finished parts.
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\setup-build.ps1            # set up
@@ -31,6 +35,10 @@ $KlGit = @{ Url = "https://github.com/BFrizzleFoShizzle/KenshiLib.git"; Tag = "v
             Commit = "11cd65d557dea76c6540239acf467e0e06e09cf7" }
 $Boost = @{ Url = "https://archives.boost.io/release/1.60.0/source/boost_1_60_0.tar.gz"
             Sha = "21ef30e7940bc09a0b77a6e59a8eee95f01a766aa03cdfa02f8e167491716ee4"; File = "boost_1_60_0.tar.gz" }
+$MinHook = @{ Url = "https://github.com/TsudaKageyu/minhook/archive/refs/tags/v1.3.4.zip"
+             Sha = "172708123daa0c98d20d3a980b16a50be14af243dc95dee6f79c24193ad010e4"; File = "minhook-1.3.4.zip" }
+$Iced = @{ Url = "https://registry.npmjs.org/iced-x86/-/iced-x86-1.22.0.tgz"
+          Sha = "be77147b3c91531da378d103b4e3e5a45e9ddc29392fe01e6c214e799da125c3"; File = "iced-x86-1.22.0.tgz" }
 # The SDK's packages that hold the x64 compiler, CRT, and Windows headers/libs.
 $Msis = @("vc_stdx86", "vc_stdamd64", "WinSDKBuild_amd64", "WinSDK_amd64")
 
@@ -92,9 +100,35 @@ if (-not (Test-Path -LiteralPath (Join-Path $Tc.Boost "boost\version.hpp"))) {
     Remove-Item -LiteralPath $tar
 }
 
-# 4. Smoke test: the compiler runs.
+# 4. MinHook sources (only its C files and header are used).
+if (-not (Test-Path -LiteralPath (Join-Path $Tc.MinHook "src\hook.c"))) {
+    $zip = Get-Pinned $MinHook
+    if (Test-Path -LiteralPath $Tc.MinHook) { Remove-Item -Recurse -Force -LiteralPath $Tc.MinHook }
+    Expand-Archive -LiteralPath $zip -DestinationPath $Tc.Root -Force
+    if (-not (Test-Path -LiteralPath (Join-Path $Tc.MinHook "src\hook.c"))) { throw "MinHook sources not found in $($Tc.MinHook)" }
+}
+
+# 5. iced-x86 (package\iced_x86.js + .wasm from the npm tarball).
+if (-not (Test-Path -LiteralPath $Tc.Iced)) {
+    $tgz = Get-Pinned $Iced
+    $dir = Split-Path (Split-Path $Tc.Iced)
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    & "$env:SystemRoot\System32\tar.exe" -xzf $tgz -C $dir
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Tc.Iced)) { throw "unpacking iced-x86 failed" }
+}
+
+# 6. Smoke test: cl 16.00 runs and compiles MinHook; Node loads the decoder and decodes one instruction.
 Use-Toolchain
 $ErrorActionPreference = "Continue"
-$banner = (& $Tc.Cl 2>&1 | Select-Object -First 1 | ForEach-Object { "$_" }) -join ""
-Write-Host "Ready: $banner"
+$banner = (& $Tc.Cl 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -match "Version" } | Select-Object -First 1) -join ""
+$smoke = Join-Path $Tc.Root "smoke"
+New-Item -ItemType Directory -Force $smoke | Out-Null
+$mhOut = (& $Tc.Cl /nologo /c /O2 /MD /W3 "/Fo$smoke\\" @(Get-MinHookSources) 2>&1 | ForEach-Object { "$_" }) -join "`n"
+$mhOk = ($LASTEXITCODE -eq 0)
+$node = Get-ToolNode
+$iceOut = (& $node -e "const i=require(process.argv[1]);const d=new i.Decoder(64,new Uint8Array([0x48,0x8b,0x05,1,2,3,4]),0);console.log(d.decode().length)" $Tc.Iced 2>&1 | ForEach-Object { "$_" }) -join ""
+Remove-Item -Recurse -Force -LiteralPath $smoke
+if (-not $mhOk) { throw "MinHook does not compile with $banner`n$mhOut" }
+if ($iceOut -ne "7") { throw "iced-x86 does not decode with ${node}: $iceOut" }
+Write-Host "Ready: $banner; MinHook 1.3.4 compiles; iced-x86 1.22.0 decodes (Node $node)"
 Write-Host "Build the plugin with: powershell -ExecutionPolicy Bypass -File scripts\build-plugin.ps1"
