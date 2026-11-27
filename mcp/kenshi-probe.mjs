@@ -57,7 +57,7 @@ export const TOOLS = [
     inputSchema: obj({ query: { type: 'string' }, category: { type: 'string', description: 'item (default), weapon, armour, or an itemType number' }, limit: { type: 'integer', minimum: 1, maximum: 300 } }) },
   { name: 'kenshi_heal', cmd: 'heal',
     description: 'CHANGES THE GAME (needs probe_write=1). Sets every body part of own characters to its max health and blood to max, stops bleeding. Only when the user asks.',
-    inputSchema: obj({ who: { ...WHO, description: WHO.description + ' (default all)' }, stun: { type: 'string', enum: ['keep', 'max', 'zero'], description: 'what to do with the stun value (default keep)' } }) },
+    inputSchema: obj({ who: { ...WHO, description: WHO.description + ' (default all)' }, stun: { type: 'string', enum: ['zero', 'keep'], description: 'stun damage: zero = full heal (default), keep = leave it' } }) },
   { name: 'kenshi_teleport', cmd: 'teleport',
     description: 'CHANGES THE GAME (needs probe_write=1). Moves own characters to x/y/z (absolute) or by dx/dy/dz (relative). Only when the user asks; read the position again afterwards.',
     inputSchema: obj({ who: { ...WHO, description: WHO.description + ' (default selected)' }, x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' }, dx: { type: 'number' }, dy: { type: 'number' }, dz: { type: 'number' } }) },

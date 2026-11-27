@@ -128,7 +128,7 @@ Second run (same game, character Gecko), all measured:
 | `{"cmd":"health","who":"all"}` | per body part: flesh, stun, maxHealth, hpMult, percent; blood, maxBlood, hunger |
 | `{"cmd":"inventory","who":"first"}` | items per inventory section with quantity |
 | `{"cmd":"find_items","query":"bread","category":"item"}` | item templates: name and string ID |
-| `{"cmd":"heal","who":"all","stun":"keep"}` | **write**: parts to max health, blood to max, bleeding 0; `stun` keep, max or zero |
+| `{"cmd":"heal","who":"all"}` | **write**: parts to max health, blood to max, bleeding 0; stun damage to 0 (`"stun":"keep"` leaves it) |
 | `{"cmd":"teleport","who":"selected","dx":200}` | **write**: absolute x/y/z or relative dx/dy/dz via `CharMovement::_setPositionAndTeleport`; lost while the game is paused |
 | `{"cmd":"spawn_item","name":"...","quantity":1}` | **write**: `RootObjectFactory::createItem` + `Inventory::addItem`; weapons fail, see below |
 | `{"cmd":"log_tail","lines":50}` | `text`: last lines (max 500) |

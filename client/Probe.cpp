@@ -704,7 +704,7 @@ namespace
 
     struct HealResult { int parts; float bloodBefore, bloodAfter; };
 
-    // stunMode: 0 keep, 1 set to the part's max, 2 set to 0.
+    // stunMode: 0 keep, 2 set to 0 (fleshStun is stun DAMAGE: percent = (flesh - fleshStun) / max, measured).
     bool HealOne(Character* c, int stunMode, HealResult* r)
     {
         __try
@@ -719,8 +719,7 @@ namespace
                 if (!p) continue;
                 float maxHealth = KP_FIELD(p, MedicalSystem::HealthPartStatus, _maxHealth);
                 KP_FIELD(p, MedicalSystem::HealthPartStatus, flesh) = maxHealth;
-                if (stunMode == 1) KP_FIELD(p, MedicalSystem::HealthPartStatus, fleshStun) = maxHealth;
-                else if (stunMode == 2) KP_FIELD(p, MedicalSystem::HealthPartStatus, fleshStun) = 0.0f;
+                if (stunMode == 2) KP_FIELD(p, MedicalSystem::HealthPartStatus, fleshStun) = 0.0f;
                 p->updateDerivedHealths();
                 ++r->parts;
             }
@@ -738,9 +737,9 @@ namespace
 
     std::string DoHeal(GameWorld* gw, const char* line)
     {
-        char stun[16] = "keep";
+        char stun[16] = "zero";   // full heal by default
         GetStr(line, "stun", stun, sizeof(stun));
-        int stunMode = _stricmp(stun, "max") == 0 ? 1 : _stricmp(stun, "zero") == 0 ? 2 : 0;
+        int stunMode = _stricmp(stun, "keep") == 0 ? 0 : 2;
         Character* list[KP_PROBE_MAX_CHARS];
         unsigned int n = 0;
         const char* err = "";
