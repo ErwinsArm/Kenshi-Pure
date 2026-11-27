@@ -16,6 +16,7 @@
 #include "Display.h"
 #include "Probe.h"
 #include "Pose.h"
+#include "Cheat.h"
 
 #define KP_VERSION "0.0.3-m1"
 
@@ -177,6 +178,7 @@ namespace
             AbiProof(gw);
         }
         if (g_abi != ABI_FAIL) kp::PoseOnFrame(gw);
+        if (g_abi != ABI_FAIL) kp::CheatOnFrame(gw);
         if (g_abi != ABI_FAIL && kp::FeatureOn("optional:probe")) kp::ProbeOnFrame(gw, g_frames, g_frameThread);
     }
 
@@ -228,6 +230,7 @@ extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
     }
     kp::Log("frame: hook installed; waiting for the first frame");
     kp::PoseInit();
+    kp::CheatInit();
     if (kp::FeatureOn("optional:probe")) kp::ProbeStart();
     else kp::Log("probe: off (its addresses are not all resolved for this build)");
     return 1;

@@ -194,6 +194,89 @@ when `mods\KenshiPure\KenshiPure.cfg` holds `probe_write=1` (written by `install
 removed by a plain install or `-Uninstall`). Port bound to loopback; other programs on the same PC can
 still connect (no authentication), so keep writes off when not testing.
 
+# Client: cheat hotkeys (the user's testing tool)
+
+Source: `client/Cheat.cpp`, `client/Cheat.h`; hooked in `client/KenshiPure.cpp` (`CheatInit`, `CheatOnFrame`
+in the frame listener). Built and compile-checked; **not yet run in game**. Addresses: existing probe rows plus
+`Character::teleport` (feature `optional:cheat-write`, proven in 1.0.65 0x5c9bf0 and 1.0.68 0x5ca680, shift
+0xa90 like its 8 neighbours).
+
+- Hotkeys, not a drawn window: read with `GetAsyncKeyState` on the game thread after each frame, so they do
+  not depend on Kenshi's renderer or GUI and work in full screen, windowed and while paused. Only while the
+  game window is in front, Ctrl+Shift held and Alt not held (AltGr is Ctrl+Alt). Feedback: Windows' "OK"
+  sound on success, its error sound on failure, and a `cheat: ...` line in `KenshiPure.log`.
+- Target: the player's selected character, only if it is one of `playerCharacters`.
+- Knock out (**M**, 1.0.65 disassembly): `MedicalSystem::reassessCollapseMode` (0x648890) sets
+  `unconcious` (`+0x161`) when `knockoutTimer` (`+0xA0`) is above a threshold, among other triggers
+  (blood, a part's collapse stage, hunger). It runs from the periodic medical update, not every frame, so
+  the fall may come a moment later; the timer's unit is not measured. Without the timer reset, a healed
+  character would stay down.
+- The keys still reach the game (not swallowed); Kenshi's own bindings for Ctrl+Shift+letter are not checked.
+  No sound in the Windows sound scheme → no beep; the log stays.
+
+| Keys | Action |
+|---|---|
+| Ctrl+Shift+H | heal: every part to max health, stun damage 0, blood to `getMaxBlood`, bleed rate 0 (the probe's measured full heal), knockout timer 0 |
+| Ctrl+Shift+J | damage: each non-robotic part loses 30 % of its max health, never below -50 % (margin to death: **I**) |
+| Ctrl+Shift+K | knock out: torso and head parts get stun damage so their health reads -20 % (stun recovers), and `MedicalSystem::knockoutTimer` is raised to 20 |
+| Ctrl+Shift+U | spawn the current item of the list into the inventory (full → on the ground) |
+| Ctrl+Shift+O | next item of the list |
+| Ctrl+Shift+T | teleport to the camera centre (`GameWorld::getCameraCenter`; that it is the point the camera looks at, not the eye: **I**, the log shows both) |
+
+- Off unless `mods\KenshiPure\KenshiPure-cheats.cfg` holds `cheats=1` (its own file, because
+  `install-client.ps1` rewrites `KenshiPure.cfg` on every install). Also there: `cheat_item=<exact name or
+  string ID>[*count]` (repeatable, count 1–100; none → `Bread*5`, `Katana`, `Samurai Armour`) and
+  `cheat_weapon_maker=<name or string ID>` (default `1057-gamedata.base`). Uninstall leaves this file.
+- Single-player only by intent: nothing stops it in a multiplayer session yet (needed before M3 is used with
+  others).
+
+## The probe's three bugs: causes and fixes
+
+Read in RE_Kenshi's 1.0.65 exe (`Kenshi_x64.exe`, SHA-256 `504b362cde850d56afb1cea6f5b7b0ee014d9dd7b47e188599d91c804502cd3e`;
+iced-x86 disassembly; RVAs, image base 0x140000000). In 1.0.68 only the rows we call are proven (the proof
+rules above); their callees (`tryAddItem`, the section's `addItem`, ...) were not compared.
+
+1. **Weapons: the factory returned nothing.** `RootObjectFactory::createItem(gd, hand, weaponMesh, matData,
+   level, faction)` (0x57fcc0) reads the GameData type (`gd+0x50`) and returns 0 at once for type 2
+   (`WEAPON`) and a few others (`cmp eax,2; je` → `xor eax,eax`, **M**). Weapons are built in its branch for type 0x33
+   (`WEAPON_MANUFACTURER`): gd = maker, third argument = the weapon (null → one picked from the maker's
+   "weapon types" list), null material → picked from the maker's "material" list; with no level found it
+   falls back to maker `1057-gamedata.base` and material `1058-gamedata.base` (so `cheat_weapon_maker`
+   is then ignored), then allocates 0x258 bytes and builds the weapon (**M**). Fix: `createItem(maker, hand(), weaponData, NULL, -1, NULL)`. That the
+   third argument takes the weapon's own GameData (KenshiLib calls it `weaponMesh`) is **I**: the log names
+   the item made.
+2. **Amount > 1 left extra single items.** `Inventory::addItem(item, q, drop, destroy)` (0x745140) calls
+   `tryAddItem(item, q)` (0x74b1e0), which tries each section's `InventorySection::addItem` (0x74bd70) and
+   passes q = 1 to the sections after one fails. A section's addItem sets q = q + item quantity - 1 and the
+   item's quantity (`+0x12C`) to 1, merges into matching stacks, then, while q is above the stack limit,
+   places copies (`RootObjectFactory::copyItem`) one by one; when a later placement finds no space it
+   returns false and does not take the placed copies back (**M**). After a failed `tryAddItem`,
+   `addItem`'s own drop path drops the item and, for an item that does not stack, copies (`copyItem`) and
+   drops more per its quantity (**M**). Which of these made the probe's 5 + 4 is **I**. Fix: an amount N is
+   N single creates and `addItem(item, 1, true, false)` calls: q = 1 never copies in the section code; the
+   log gives the item's quantity right after `createItem` (1 expected, **I**) and the stack merge is
+   expected to join them (**I**).
+3. **Teleport lost while paused.** The probe called only `CharMovement::_setPositionAndTeleport(pos, 0)`
+   (0x65deb0). The game's `Character::teleport(const Vector3&)` (0x5c9bf0) also writes the character's own
+   position (`this+0x48`), calls the movement's `_setPositionAndTeleport(pos, -1)` (vtable +0xB8 of
+   `this+0x640`; floor -1 leaves `+0x334` unchanged, 0 set it to 9) and, unless a thread runs
+   (`ThreadClass::isRunning`), `AnimationClass::setPosition` on `this+0x448` (**M**). Which difference lost
+   the move is **I**. Fix: `Character::teleport`. Check (log only): the position right after the teleport
+   and again after 1 s of running game, with the distance to the target.
+
+## Test steps for the user (after M3, with the game free)
+
+1. Install the new build (`scripts/install-client.ps1`, with `-ProbeWrite` if the probe should also write).
+2. Switch the cheats on once (PowerShell, Kenshi's folder may differ):
+   `Set-Content "C:\Program Files (x86)\Steam\steamapps\common\Kenshi\mods\KenshiPure\KenshiPure-cheats.cfg" "cheats=1" -Encoding ASCII`
+3. Start Kenshi, load a save, select one of your characters, then try each key, also once while paused:
+   Ctrl+Shift+J three or four times (health bars drop; the character may fall over), Ctrl+Shift+H (all
+   healthy again), Ctrl+Shift+K (falls unconscious, wakes up later by itself), Ctrl+Shift+U (5 bread in the
+   bag, one stack), Ctrl+Shift+O then U (a katana), O then U (samurai armour), move the camera away and
+   Ctrl+Shift+T (the character stands where the camera looks; once more while paused, then unpause).
+4. Tell Claude what you saw, and whether a key also did something else in the game. Claude reads the
+   `cheat:` lines in `KenshiPure.log`.
+
 # Client plugin: display fix
 
 Source: `client/Display.cpp`. Kenshi can start full screen in a smaller, stretched mode until Alt+Enter
