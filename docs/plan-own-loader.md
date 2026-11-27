@@ -1,86 +1,106 @@
-# Plan: KenshiPure without RE_Kenshi (own loader, own address layer)
+# Plan: KenshiPure foundation without RE_Kenshi (own loader, own address layer)
 
-Goal: KenshiPure starts on its own, early (before the game window exists), on the Steam exe as Steam
-ships it (1.0.68), on RE_Kenshi's 1.0.65 copy and on GOG 1.0.65, with or without RE_Kenshi installed,
-as AnarchyKenshi does. Labels: **M** measured, **D** documented, **I** inferred.
+Goal: KenshiPure starts on its own and early (before the game window exists), with no other mod
+needed, on the exe the player has: Steam 1.0.68 as shipped, RE_Kenshi's 1.0.65 copy, GOG. It is the
+base for features that fix what players feel in AnarchyKenshi (AK): slow item moves and inventory,
+slow world loading (AK lowered movement speed), broken shopkeepers. Model: AK's own approach. Both
+critics reviewed this design twice. Labels: **M** measured, **D** documented, **I** inferred.
 
-## Facts the plan rests on
+## Facts it rests on
 
-1. KenshiLib 0.5.0 knows exactly two exes, both 1.0.65 (Steam, GOG), by MD5 (`HashToVersionMap`,
-   `Source/kenshi/Kenshi.cpp`, **M**); RVA files only `Steam_1.0.65.br`, `GOG_1.0.65.br` (**M**). No
-   KenshiLib release up to v0.5.1 mentions 1.0.68; RE_Kenshi runs 1.0.68 installs by making a
-   1.0.65-compatible exe in `<Kenshi>\RE_Kenshi\` (**D**, README and releases).
-2. Steam's exe is 1.0.68 (`a596ab4e…`); with RE_Kenshi the game runs its 1.0.65 copy (**M**,
-   [kenshi-build.md](findings/kenshi-build.md)). Without RE_Kenshi, KenshiLib cannot start.
-3. The `.br` table has 7630 entries: 7622 into `.text`, the last 8 into `.data` (globals such as `ou`)
-   (**M**). `InitRVAs` stores `image base + offset` (**M**, `Source/core/Functions.cpp`).
-4. `KenshiPure.dll` uses about 25 game functions plus the global `ou` through KenshiLib (**M**, its
-   imports); the rest of KenshiLib's table is unused by us.
-5. Display cause and timing (**M**, AK's log, [AnarchyKenshi.dll.md](findings/AnarchyKenshi.dll.md) §5):
-   Kenshi creates the swap chain windowed, 1920x1080 @ 0/0, `DXGI_MODE_SCALING_STRETCHED`; AK sets
-   `UNSPECIFIED` in a `CreateSwapChain` hook and also hooks `ResizeTarget`. AK's hook was in place
-   0.16 s before the game's call, so an Ogre plugin line in `Plugins_x64.cfg` is early enough; RE_Kenshi
-   post-load plugins (~7.5 s) come after the swap chain (**M**, RE_Kenshi_log.txt).
-6. RE_Kenshi restarts only when the running exe is not one it supports ("Version incompatible,
-   restarting..." in `RE_Kenshi.dll`, **M** string; the condition is **I**).
-7. The user's game folder has `dxgi.dll` = ReShade 5.4.2 (**M**); it wraps the same DXGI calls.
-8. KenshiLib, RE_Kenshi and MinHook licences allow reuse in our AGPL-3.0 repo (**D**).
+1. KenshiLib 0.5.0 knows only the 1.0.65 exes (MD5 map; `Steam_1.0.65.br`, `GOG_1.0.65.br`, 7630
+   entries: 7622 in `.text`, 8 globals) (**M**). RE_Kenshi's copy has KenshiLib's Steam 1.0.65 MD5
+   `df4a5a7e…` (**M**). No KenshiLib release mentions 1.0.68; RE_Kenshi runs 1.0.68 installs through a
+   1.0.65-compatible exe (**D**). [kenshi-build.md](findings/kenshi-build.md)
+2. AK is an Ogre plugin in `Plugins_x64.cfg`; with tables of 795 sites (Steam 1.0.68 RVA, a second
+   column of unknown build, masked pattern) it found 798/799 sites in 500 ms on the 1.0.65 exe, and
+   drops hits far off the median shift (**M**, AK log, [hooks.md](findings/hooks.md)). AK's second
+   column is not GOG 1.0.65 (43 of 756 hits, chance level, **M**).
+3. AK also patches mid-function sites, redirects call sites, patches vtable slots, one IAT entry, a
+   1001-site static-to-thread-local table, and hooks OgreMain/ParticleUniverse exports (**M**, hooks.md §3).
+   About 173 of its 795 sites match no KenshiLib declaration (**M**, [ak-kenshilib-names.tsv](findings/ak-kenshilib-names.tsv)).
+4. 1.0.65 → 1.0.68: `.text` grows by 0xF20 bytes; code moves in about 17–18 blocks with constant
+   shifts from −0x7e0 to +0xed0; in a sample 346 of 348 neighbouring functions keep their order (**M**,
+   critics' scripts). Unique-prologue matching alone bound wrong functions (e.g.
+   `AppearanceManager::setHead` +0x6d9f10) (**M**).
+5. Display: the game creates the swap chain windowed, `DXGI_MODE_SCALING_STRETCHED`; AK sets
+   `UNSPECIFIED` 0.16 s before the call (**M**, AK log, [AnarchyKenshi.dll.md](findings/AnarchyKenshi.dll.md) §5).
+   The user's game folder has ReShade (`dxgi.dll` 5.4.2) (**M**).
+6. KenshiLib names are community guesses in places (AK's `AI_haveRepairKit` is KenshiLib's
+   `haveFirstAidKit_robot`) (**M**); field values such as `knockoutTimer` are doubtful (docs/client.md).
 
 ## Design
 
-**A. Loader `KenshiPureLoader.dll`** — Ogre plugin (exports `dllStartPlugin`/`dllStopPlugin`), line
-`Plugin=mods/KenshiPure/KenshiPureLoader` appended **after** `Plugin=RE_Kenshi` when that exists (a
-process RE_Kenshi restarts exits before reaching us, **I**). Single instance per process; logs pid, exe
-path and hash. Stays idle when AnarchyKenshi is loaded. Installs the display hook (B), resolves
-addresses (C), then starts `KenshiPure.dll` via an exported `kpStart()`.
+### 1. Loader `KenshiPureLoader.dll` (VS2010, thin)
+- Ogre plugin (`dllStartPlugin`/`dllStopPlugin`), line appended after `Plugin=RE_Kenshi` if present;
+  pins itself against unload; single instance per process; logs pid, exe path, SHA-256.
+- AK detection by reading `Plugins_x64.cfg` (AK may load after us), not by `GetModuleHandle`.
+- Order: display hook → address layer → `KenshiPure.dll` through a versioned C interface
+  (`kpStart(const KpHost*)`, the struct carries a version and the resolved slot table).
 
-**B. Display fix** — hook `IDXGIFactory::CreateSwapChain` (factory from `CreateDXGIFactory1`) and
-`IDXGISwapChain::ResizeTarget`: when `kenshi.cfg` says full screen, set `BufferDesc.Scaling =
-UNSPECIFIED`; log the request before and after. The minimize-restore in `client/Display.cpp` stays as
-the fallback when the client area still differs from the desktop mode. Test with ReShade on.
+### 2. Display fix
+Hook `IDXGIFactory::CreateSwapChain` on the factory object the game actually receives (ReShade may
+wrap it); inside the first call hook `ResizeTarget` once. Full screen in `kenshi.cfg` → `Scaling =
+UNSPECIFIED`; log before/after. Minimize-restore (`client/Display.cpp`) stays as fallback.
 
-**C. Own small address layer instead of KenshiLib** — only the functions and globals KenshiPure uses
-(about 25 + `ou`, grows with features):
-- Per known exe (SHA-256): a committed table `client/rva/<build>.rva` with a header (magic, count,
-  hash of the symbol list) and one RVA per symbol, by name.
-- 1.0.65 Steam/GOG: taken from KenshiLib's `.br` files by symbol index.
-- 1.0.68 Steam: generated offline (`scripts/gen-rva.mjs`) from the two exes on the user's PC; a
-  function counts only if its masked body is unique in **both** exes and its shift agrees with its
-  neighbours'; globals come from RIP-relative operands of matched code; every entry checked by hand
-  in Ghidra/REA before it is committed.
-- Calls: a small ml64 file defines each used mangled name as `jmp [table+i*8]` (KenshiLib's own
-  mechanism, for our list only), so KenshiLib's headers keep compiling unchanged for types and calls.
-- Missing entry → the slot points at a trap stub that logs the symbol and returns; the feature that
-  needs it is switched off at start, never the game.
-- Hooks: MinHook (upstream, pinned by SHA-256 in `setup-build.ps1`).
-- Unknown exe: log which build it is and stay inactive (no run-time pattern scan for now).
+### 3. Address layer
+One committed table `client/sites.tsv`; columns: name, kind, module (exe, OgreMain, …), required or
+optional, per-build value (builds named by SHA-256; GOG 1.0.65 marked "MD5 only, unmeasured"),
+pattern, offset of the site inside the pattern, expected bytes (patches), evidence (where it was
+proven). Kinds: `code` (function), `global` (from a RIP-relative operand of a matched anchor),
+`field`, `vslot` (or RTTI vtable lookup), `patch` (mid-function bytes), `callsite`, `data`.
+- **Known build** (SHA-256 match): check every row's pattern at its recorded address; mismatch →
+  row unresolved.
+- **Shift check**: a 1.0.68 address must equal the 1.0.65 address plus its neighbours' block shift
+  and keep the order of its neighbours; anything else is rejected, even a unique hit.
+- **Unknown build**: scan the exe file for patterns, apply the same shift/order check, but run only
+  the display fix and read-only features: layouts are unproven there.
+- Every slot is pre-filled with a trap stub that logs the name; nothing ever jumps to 0 or the image base.
+- `required` rows missing → KenshiPure stays inactive (log says which). `optional` rows → the feature
+  is off, and the feature set is sent to the server at login so no client silently desyncs.
+- Patterns are made by us from the exes, never copied from AK (AK's tables only tell us *where* to
+  look). Patterns of Kenshi's exe are committed (user's approval).
 
-**D. KenshiPure.dll changes** — version check reads our resolver, not `KenshiLib::GetKenshiVersion`;
-the frame-hook address comes from our table, not `GetProcAddress(KenshiLib.dll, …)`; `startPlugin`
-and `RE_Kenshi.json` go (no double start under RE_Kenshi); no `KenshiLib.dll` import (build check).
+### 4. Calling and reading the game
+- Functions: KenshiLib headers for declarations; a generated ml64 file defines each used mangled name
+  as `jmp [slot]`. `ou` and other globals: our own slot, KenshiLib's `Globals.h` shadowed.
+- **Fields only through `KP_FIELD(Class, member)` accessors** that read the per-build offset from the
+  table and register the row; the build fails on raw member access to game structs (checked by a
+  script over the source). Writes need a row whose evidence says "both builds proven".
+- Build of `sites.tsv` rows: `scripts/sites.mjs` (address from KenshiLib's table or an RVA, pattern with
+  operands masked by a real x64 decoder, pinned like other tools; uniqueness in both exes; shift
+  check); `sites.mjs check` re-proves all rows against both exes before a build that changes them.
 
-## Blind spots and how each is closed
+### 5. Hooks
+Own hook dispatcher: one detour per site, a list of listeners behind it (several features on one
+function). Engine: MinHook pinned by SHA-256 (its `multihook` branch or upstream behind our
+dispatcher), proven to build with cl 16.00; code-cave allocator for `patch`/`callsite` kinds.
 
-1. **Struct layouts and vtable slots 1.0.65 → 1.0.68** for every field and virtual call we use: compare
-   the instructions that use each offset/slot in both exes; until done, 1.0.68 runs read-only.
-2. **RE_Kenshi on, RE_Kenshi off** — both need a run by the user; the loader's pid log line shows what
-   happened in each process.
-3. **Two hook engines** (RE_Kenshi's MinHook and ours) on the same function: we hook only the frame
-   loop and DXGI; check that RE_Kenshi and the user's workshop plugins do not hook those.
-4. **ReShade** wraps DXGI: our hook must sit on the factory the game actually gets; test with it on.
-5. **Without RE_Kenshi** its shader cache and fast heightmap are gone (slower loading, **M** log).
-6. **GOG 1.0.68**: no exe here; unsupported until someone provides one.
-7. **Kenshi updates**: a new exe → "unknown build, inactive" with a clear log line, until a table is added.
-8. **Anti-virus**: early in-memory patching can trip heuristics (AK warns about it).
+### 6. Split by compiler
+Only the game adapter (loader, address layer, hooks, game calls, accessors) is VS2010 (v100, Kenshi's
+CRT). Protocol, sync, prediction and later server-shared logic go into a modern-compiler DLL behind a
+plain C interface (as [plan-first-playable.md](plan-first-playable.md) already intends).
 
-Not doing: building all of KenshiLib (needs its MinHook fork, Boost libs, MSBuild; days of work for
-7600 functions we do not use). Not committing byte patterns of Kenshi's exe (only RVAs).
+### 7. Using AnarchyKenshi as a map
+AK's decompile (REA/Ghidra) stays our guide for *where* to intervene for each player problem
+(loading and movement speed, inventory, shops, the thread-local patch table) and how AK did it;
+each site we need is then rebuilt and proven in our own table.
 
-## Steps and checks
+## Blind spots still open (need runs or data)
 
-1. Resolver + ml64 stub table + MinHook for today's 1.0.65; KenshiPure without KenshiLib, still started
-   by RE_Kenshi → log identical to today (proves the layer).
-2. `gen-rva.mjs` for 1.0.68 Steam, hand-checked entries.
-3. Loader + DXGI hook + installer line in `Plugins_x64.cfg`.
-4. User runs: RE_Kenshi on / off, each: log, full screen without Alt+Enter, probe `status`/`characters`.
-5. Blind spot 1 before any write command is allowed on 1.0.68.
+- RE_Kenshi on/off and the plugin order: needs a user run with the loader's pid log.
+- ReShade with the DXGI hook: needs a user run.
+- 1.0.68 layouts: proven per field as features need them; until then 1.0.68 is read-only for that field.
+- GOG: no exe here; best effort through the unknown-build path.
+- Redistributing our built DLLs (VS2010 / SDK 7.1 runtime terms) before a public release: check then.
+- Without RE_Kenshi its shader cache and fast heightmap are gone (slower loading than with it).
+
+## Steps
+
+1. Toolchain: pinned MinHook and x64 decoder; build check for the new DLLs.
+2. Address layer + accessors + trap stubs for 1.0.65; KenshiPure without KenshiLib.dll, still started by
+   RE_Kenshi → same log as today.
+3. `sites.mjs` with shift check; 1.0.68 rows for everything KenshiPure uses; fields proven.
+4. Loader + display hook + installer line; RE_Kenshi `startPlugin` path removed.
+5. User runs: RE_Kenshi on / off, ReShade on: logs, full screen without Alt+Enter, probe works.
+6. Split out the modern-compiler core before M2 (server) starts.
