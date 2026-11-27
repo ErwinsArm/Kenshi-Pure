@@ -269,22 +269,6 @@ namespace
         return false;
     }
 
-    typedef void (*ProcessKillListFn)(GameWorld*, bool);   // GameWorld::processKillList is protected in KenshiLib's header
-    bool ProcessKillListNow()
-    {
-        __try
-        {
-            ProcessKillListFn fn = reinterpret_cast<ProcessKillListFn>(kp::SiteAddress(KPS_GameWorld__processKillList));
-            if (!fn) return false;
-            fn(kp::GameWorldGlobal(), true);
-            return true;
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            return false;
-        }
-    }
-
     // The save guard: SaveManager::saveGame is the one place that writes a save (its only caller is
     // SaveManager::execute 0x47c11b; save() and the autosave only ask for one, 1.0.65 0x47b0fe / 0x47b95f, M).
     typedef int (*SaveGameFn)(SaveManager*, const std::string&, const std::string&);
@@ -306,12 +290,12 @@ namespace
             }
             if (n > 0)
             {
-                bool flushed = ProcessKillListNow();
+                // No forced GameWorld::processKillList(true) here: freeing the body at once crashed the game 0.5 s
+                // later in Character::stumbleState (run 6, M); destroy's own (possibly deferred) path is left alone.
                 for (int i = 0; i < KP_SKIP_REMOTE; ++i)
                     if (g_slots[i].used && g_slots[i].destroyed && Resolve(i)) ++still;
                 ++g_savesGuarded;
-                kp::Log("remote: a save starts - removed %d bod%s first (kill list %s, %d still resolve)", n, n == 1 ? "y" : "ies",
-                        flushed ? "processed" : "NOT processed (faulted)", still);
+                kp::Log("remote: a save starts - destroyed %d bod%s first (%d still resolve)", n, n == 1 ? "y" : "ies", still);
             }
         }
         return g_saveOrig(self, location, name);
@@ -359,7 +343,7 @@ namespace kp
         g_saveGuard = false;
         if (cfg.saveGuard)
         {
-            if (SiteOk(KPS_SaveManager__saveGame) && SiteOk(KPS_GameWorld__processKillList) &&
+            if (SiteOk(KPS_SaveManager__saveGame) &&
                 HookSite(KPS_SaveManager__saveGame, (void*)&SaveGameDetour, reinterpret_cast<void**>(&g_saveOrig)))
                 g_saveGuard = true;
             else

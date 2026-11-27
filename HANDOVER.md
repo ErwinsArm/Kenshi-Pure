@@ -60,7 +60,14 @@ State: M5 code committed as work in progress (builds, all 5 net tests pass incl.
 - Run 5 (G7 without the guard, copy "KP TEST MP TEST": save at 40 s, load at 75 s): **the save kept the body**: after
   the load the old hand resolved to "[KP] bot", No Faction ("kept 1 body"). So the guard is needed. Added: a sweep
   once per world after it settled (`RemoteSweep`), so a kept body is removed even with nobody connected.
-- Run 6 (same with the guard on): running.
+- Run 6 (same with the guard on): `SaveManager::save` called saveGame at once (guard 32 ms after the request, same
+  thread); "removed 1 body first (kill list processed, 0 still resolve)", then 0.5 s later an access violation in
+  `Character::stumbleState` (1.0.65 0x4351d0+0x27) and the game stopped (crash dump): something still held the body
+  that `processKillList(true)` freed. **The forced kill list before a save is unsafe** -> not to be used.
+- Run 7 (guard off, `remote_squad_permanent=0`): the body was saved anyway ("kept 1 body" after the load); a
+  temporary squad does not keep it out.
+- Guard changed: destroy only (the game's own possibly deferred path), no forced kill list; row
+  `GameWorld::processKillList` removed. Run 8 (guard on, same save/load steps): running.
 - Peer note from the user: AK is only a reference; pick the drive by measurement (smoothest, least lag).
 
 ## Next steps (in order)
