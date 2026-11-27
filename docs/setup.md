@@ -134,6 +134,8 @@ build\net\Release\kp-server.exe --port 27850
 build\net\Release\kp-bot.exe --host 127.0.0.1 --port 27850 --name Bot --radius 50 --speed 20
 ```
 
-`kp-server --log-poses` logs each player's pose once a second. `kp-server --local` accepts only this PC; without it Windows may ask once whether to allow it
+For an in-game test, double-click `start-test-server.cmd` in the repo folder: it opens the server
+(`--local --log-poses`) and the bot in two windows and also writes `build\net\kp-server.log` and
+`kp-bot.log`; closing a window stops it. `kp-server --log-poses` logs each player's pose once a second. `kp-server --local` accepts only this PC; without it Windows may ask once whether to allow it
 through the firewall. `--help` lists the options. Protocol: `docs/protocol-ours.md`.
 Removal: `scripts\setup-modern.ps1 -Uninstall` (deletes `tools\modern\`) and delete `build\net\`.
