@@ -21,6 +21,22 @@ outlaws with matching faction names; `unconscious` turned true when the user's c
 - `log_tail` is answered on the server thread from an in-memory ring of the last 500 log lines
   (no game access).
 
+Second run (same game, character Gecko), all measured:
+
+- `health`: `percent` = (flesh - stun) / maxHealth on all 7 parts (Chest: (12.17 - 25.24) / 100 = -0.1307);
+  undamaged parts have stun 0. So `stun` is stun damage that recovers, and `heal` with `stun: zero`
+  is a full heal: afterwards every part read flesh 100, stun 0, percent 1, blood 75.9 of 75.9.
+- `inventory` listed equipped sections (hip, back, head, shirt, armour, legs) and the main bag; `find_items`
+  "bread" gave `Bread` / `1946-gamedata.base` (309 item templates, mods included).
+- `spawn_item` Bread x1 landed in the bag. With a full bag, Samurai Armour x1 and Bread x5 came back
+  "refused" but lay on the ground next to the character (`addItem` drops on fail). Bread x5 produced a stack
+  of 5 **and** 4 single breads (9 in all; cause unknown). Katana (category weapon) failed: the factory
+  returned nothing, likely because `createItem` needs the weapon's manufacturer/material data (inferred).
+- `teleport` while paused replied ok but the character stayed in place; unpaused, `dx 200` moved x by
+  exactly 200 and the game put y back on the ground; absolute x/y/z also worked.
+- `knockoutTimer` is non-zero (0.7, 10.8) on some knocked-out NPCs and 0 on others; `money` was 1000 for the
+  player and a Vagrants thug, 0 for Holy Nation Outlaws (still not clear whether per faction).
+
 ## Commands
 
 | Request | Reply |
@@ -28,12 +44,12 @@ outlaws with matching faction names; `unconscious` turned true when the user's c
 | `{"cmd":"status"}` | build, kenshiVersion, frames, frameThread, sameWorld, paused, frameSpeed, timeStamp, playerInterface, playerCharacters |
 | `{"cmd":"characters"}` | `characters` (player-owned, max 64): name, faction, x, y, z, player, dead, unconscious, money, blood, hunger, knockoutTimer |
 | `{"cmd":"nearby","radius":3000,"limit":30}` | `loaded` (all characters the game updates), `inRadius`, `characters` with the same fields plus `distance` from our first character, nearest first |
-| `{"cmd":"health","who":"all"}` | per body part: flesh, stun, maxHealth, hpMult, percent; blood, maxBlood, hunger (not yet run in game) |
-| `{"cmd":"inventory","who":"first"}` | items per inventory section with quantity (not yet run in game) |
-| `{"cmd":"find_items","query":"bread","category":"item"}` | item templates: name and string ID (not yet run in game) |
-| `{"cmd":"heal","who":"all","stun":"keep"}` | **write**: parts to max health, blood to max, bleeding 0 (not yet run in game) |
-| `{"cmd":"teleport","who":"selected","dx":200}` | **write**: absolute x/y/z or relative dx/dy/dz via `CharMovement::_setPositionAndTeleport` (not yet run in game) |
-| `{"cmd":"spawn_item","name":"...","quantity":1}` | **write**: `RootObjectFactory::createItem` + `Inventory::addItem` (not yet run in game) |
+| `{"cmd":"health","who":"all"}` | per body part: flesh, stun, maxHealth, hpMult, percent; blood, maxBlood, hunger |
+| `{"cmd":"inventory","who":"first"}` | items per inventory section with quantity |
+| `{"cmd":"find_items","query":"bread","category":"item"}` | item templates: name and string ID |
+| `{"cmd":"heal","who":"all","stun":"keep"}` | **write**: parts to max health, blood to max, bleeding 0; `stun` keep, max or zero |
+| `{"cmd":"teleport","who":"selected","dx":200}` | **write**: absolute x/y/z or relative dx/dy/dz via `CharMovement::_setPositionAndTeleport`; lost while the game is paused |
+| `{"cmd":"spawn_item","name":"...","quantity":1}` | **write**: `RootObjectFactory::createItem` + `Inventory::addItem`; weapons fail, see below |
 | `{"cmd":"log_tail","lines":50}` | `text`: last lines (max 500) |
 | `{"cmd":"ping"}` | `pong` |
 
@@ -46,7 +62,7 @@ unless noted):
   `isPlayerCharacter()`, `isDead()`, virtual `getMoney()`;
 - `getMedical()`: `isUnconcious()`, fields `blood` (+0x70), `hunger` (+0x60), `knockoutTimer` (+0xA0).
 - Open: `money` was the same (8377) for every Trade Ninja, so it is likely the faction's money, not the
-  person's (inferred). `knockoutTimer` stayed 0 while knocked out (meaning or offset unclear). The units
+  person's (inferred). `knockoutTimer` stayed 0 on the knocked-out player but was non-zero on some knocked-out NPCs (meaning unclear). The units
   of `blood` and `hunger` are not known (Gecko 46-48 after a fight, NPCs 80-130; hunger about 1.6-3).
 
 `Probe.cpp` sets `BOOST_ALL_NO_LIB` and `BOOST_SYSTEM_NO_DEPRECATED`: `Faction.h` pulls in Boost.Thread
