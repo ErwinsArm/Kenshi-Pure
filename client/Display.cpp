@@ -165,6 +165,9 @@ namespace
 
 namespace kp
 {
+    bool DisplayCfgFullScreen(bool* found) { return KenshiCfgFullScreen(found); }
+    bool DisplayFixOff() { return FixDisabled(); }
+
     void DisplayFixStart()
     {
         bool found = false;

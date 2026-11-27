@@ -6,8 +6,8 @@
 
 namespace kp
 {
-    // Opens the log (the previous one is kept as KenshiPure.prev.log). Safe to call once.
-    void LogOpen();
+    // Opens <name>.log next to this DLL (the previous one is kept as <name>.prev.log). Safe to call once.
+    void LogOpen(const wchar_t* name = L"KenshiPure");
     // printf-style line with time and thread id; flushed at once so a crash loses nothing.
     void Log(const char* fmt, ...);
     // Same, but gives up instead of waiting if another thread holds the log (for the

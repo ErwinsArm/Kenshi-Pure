@@ -1,11 +1,14 @@
 // KenshiPure's address layer at run time (see Sites.h). Runs once, before any hook or game call.
-//   Known build (SHA-256 of the exe is in sites.tsv): every row's pattern is checked at the address
-//   the table records for that build; an operand read there (global target, field offset) must equal
-//   the table's value. Mismatch -> the row is unresolved.
-//   Unknown build: each pattern is searched in the running exe's .text; a row needs exactly one hit,
-//   and the hits must keep the order of their 1.0.68 addresses (longest ordered subset is kept).
-//   Only read-only features run there (features whose name ends in "-write" stay off); vtable slots
-//   are not checked there yet, so vslot rows stay unresolved.
+// Patterns are checked in the exe FILE (mapped read-only), not in the loaded image: another mod may
+// already have hooked a function in memory, and the file's SHA-256 is what identifies the build.
+//   Known build (SHA-256 in sites.tsv): every row's pattern is checked at the address the table
+//   records for that build; an operand read there (global target, field offset) must equal the
+//   table's value. Mismatch -> the row is unresolved.
+//   Unknown build: each pattern is searched in the file's .text; a row needs exactly one hit; the
+//   hits must keep the order of their 1.0.68 addresses (longest ordered subset is kept) and the
+//   shift of each hit must match a neighbouring hit's shift (within kShiftSlack). Features whose
+//   name ends in "-write" stay off; vtable slots are not checked there yet, so vslot rows stay
+//   unresolved; and KenshiPure.cpp installs no game hook in an unknown build at all.
 
 #include <windows.h>
 #include <string.h>
@@ -30,34 +33,71 @@ namespace
     bool g_resolved = false;
     bool g_ok[KP_SITE_COUNT];
     void* g_addr[KP_SITE_COUNT];
+    long long g_value[KP_SITE_COUNT];
     bool g_featureOn[KP_FEATURE_COUNT];
-    unsigned char* g_base = NULL;
-    unsigned long g_textRva = 0, g_textEnd = 0, g_imageSize = 0;
+    unsigned char* g_base = NULL;        // the loaded exe: where resolved addresses point
     volatile LONG g_trapLogged[KP_SITE_COUNT];
+    const long long kShiftSlack = 0x10000;
 
-    bool FindText()
+    // The exe file, mapped read-only.
+    struct FileImage
     {
-        g_base = reinterpret_cast<unsigned char*>(GetModuleHandleW(NULL));
-        IMAGE_DOS_HEADER* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(g_base);
-        IMAGE_NT_HEADERS64* nt = reinterpret_cast<IMAGE_NT_HEADERS64*>(g_base + dos->e_lfanew);
-        g_imageSize = nt->OptionalHeader.SizeOfImage;
-        IMAGE_SECTION_HEADER* s = IMAGE_FIRST_SECTION(nt);
-        for (int i = 0; i < nt->FileHeader.NumberOfSections; ++i)
-            if (memcmp(s[i].Name, ".text\0\0\0", 8) == 0)
+        const unsigned char* view;
+        unsigned long long size;
+        const IMAGE_SECTION_HEADER* sec;
+        int nsec;
+        unsigned long textRva, textEnd;  // .text, as RVAs backed by file bytes
+    } g_f;
+
+    const unsigned char* At(long long rva, long long len)
+    {
+        if (rva < 0 || len < 0) return NULL;
+        for (int i = 0; i < g_f.nsec; ++i)
+        {
+            const IMAGE_SECTION_HEADER& s = g_f.sec[i];
+            if (rva >= s.VirtualAddress && rva + len <= (long long)s.VirtualAddress + s.SizeOfRawData)
             {
-                g_textRva = s[i].VirtualAddress;
-                g_textEnd = s[i].VirtualAddress + s[i].Misc.VirtualSize;
-                return true;
+                unsigned long long off = s.PointerToRawData + (rva - s.VirtualAddress);
+                return off + len <= g_f.size ? g_f.view + off : NULL;
             }
-        return false;
+        }
+        return NULL;
     }
 
-    bool InText(long long rva, int len) { return rva >= g_textRva && rva + len <= g_textEnd; }
+    bool MapExe(const wchar_t* path, HANDLE* file, HANDLE* map)
+    {
+        ZeroMemory(&g_f, sizeof(g_f));
+        *file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
+        if (*file == INVALID_HANDLE_VALUE) return false;
+        LARGE_INTEGER sz;
+        GetFileSizeEx(*file, &sz);
+        *map = CreateFileMappingW(*file, NULL, PAGE_READONLY, 0, 0, NULL);
+        if (!*map) return false;
+        g_f.view = static_cast<const unsigned char*>(MapViewOfFile(*map, FILE_MAP_READ, 0, 0, 0));
+        if (!g_f.view) return false;
+        g_f.size = sz.QuadPart;
+        const IMAGE_DOS_HEADER* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(g_f.view);
+        if (g_f.size < 0x400 || dos->e_magic != IMAGE_DOS_SIGNATURE || (unsigned long long)dos->e_lfanew + 0x200 > g_f.size) return false;
+        const IMAGE_NT_HEADERS64* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(g_f.view + dos->e_lfanew);
+        if (nt->Signature != IMAGE_NT_SIGNATURE || nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) return false;
+        g_f.sec = IMAGE_FIRST_SECTION(nt);
+        g_f.nsec = nt->FileHeader.NumberOfSections;
+        for (int i = 0; i < g_f.nsec; ++i)
+            if (memcmp(g_f.sec[i].Name, ".text\0\0\0", 8) == 0)
+            {
+                g_f.textRva = g_f.sec[i].VirtualAddress;
+                g_f.textEnd = g_f.sec[i].VirtualAddress + min(g_f.sec[i].Misc.VirtualSize, g_f.sec[i].SizeOfRawData);
+            }
+        return g_f.textEnd > g_f.textRva;
+    }
+
+    bool InText(long long rva, int len) { return rva >= g_f.textRva && rva + len <= g_f.textEnd; }
 
     bool MatchAt(const kp::KpSiteRow& r, long long start)
     {
         if (!InText(start, r.patLen)) return false;
-        const unsigned char* p = g_base + start;
+        const unsigned char* p = At(start, r.patLen);
+        if (!p) return false;
         for (int i = 0; i < r.patLen; ++i)
             if (r.mask[i] && p[i] != r.pat[i]) return false;
         return true;
@@ -66,7 +106,8 @@ namespace
     // Value a row stands for, read at its anchor (the site inside the matched pattern).
     long long ReadValue(const kp::KpSiteRow& r, long long anchor)
     {
-        const unsigned char* a = g_base + anchor;
+        const unsigned char* a = At(anchor, 16);
+        if (!a) return -1;
         switch (r.read)
         {
         case kp::RD_RIP: return anchor + r.readB + *reinterpret_cast<const int*>(a + r.readA);
@@ -77,28 +118,46 @@ namespace
     }
 
     // Target of a vtable slot, following one `jmp rel32` (Kenshi is linked incrementally).
-    long long SlotTarget(long long vtable, long long slot)
+    long long SlotTarget(long long vtable, long long slot, unsigned long long imageBase)
     {
-        if (vtable <= 0 || vtable + slot + 8 > g_imageSize) return -1;
-        unsigned long long va = *reinterpret_cast<const unsigned long long*>(g_base + vtable + slot);
-        long long rva = (long long)(va - (unsigned long long)g_base);
-        if (!InText(rva, 5)) return -1;
-        if (g_base[rva] == 0xE9) rva = rva + 5 + *reinterpret_cast<const int*>(g_base + rva + 1);
+        const unsigned char* p = At(vtable + slot, 8);
+        if (!p) return -1;
+        long long rva = (long long)(*reinterpret_cast<const unsigned long long*>(p) - imageBase);
+        const unsigned char* f = At(rva, 5);
+        if (!f || !InText(rva, 5)) return -1;
+        if (f[0] == 0xE9) rva = rva + 5 + *reinterpret_cast<const int*>(f + 1);
         return rva;
+    }
+
+    unsigned long long FileImageBase()
+    {
+        const IMAGE_DOS_HEADER* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(g_f.view);
+        return reinterpret_cast<const IMAGE_NT_HEADERS64*>(g_f.view + dos->e_lfanew)->OptionalHeader.ImageBase;
     }
 
     void Accept(int i, long long value)
     {
         const kp::KpSiteRow& r = kp::g_sites[i];
         g_ok[i] = true;
+        g_value[i] = value;
         if (r.kind == kp::SK_FIELD) kp::g_fieldOff[i] = (ptrdiff_t)value;
         else if (r.kind != kp::SK_VSLOT) g_addr[i] = g_base + value;
-        if (r.kind == kp::SK_CODE) kp_slots[i] = g_addr[i];
+        if (r.kind == kp::SK_CODE)
+        {
+            kp_slots[i] = g_addr[i];
+            // Informative: another module already put a jump at the start of this function.
+            const unsigned char* file = At(value, 1);
+            const IMAGE_NT_HEADERS64* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(
+                g_base + reinterpret_cast<const IMAGE_DOS_HEADER*>(g_base)->e_lfanew);
+            if (file && value < nt->OptionalHeader.SizeOfImage && g_base[value] != *file && (g_base[value] == 0xE9 || g_base[value] == 0xFF || g_base[value] == 0x48))
+                kp::Log("sites: %s is already hooked in memory by another module (first byte %02x)", r.name, g_base[value]);
+        }
     }
 
     // Known build: check each row where the table says it is.
     void ResolveKnown()
     {
+        unsigned long long imageBase = FileImageBase();
         for (int i = 0; i < KP_SITE_COUNT; ++i)
         {
             const kp::KpSiteRow& r = kp::g_sites[i];
@@ -107,7 +166,7 @@ namespace
             if (!r.pat) { Accept(i, v.value); continue; }   // header-only row (no anchor in code)
             if (r.kind == kp::SK_VSLOT)
             {
-                long long f = SlotTarget(v.anchor, v.value);
+                long long f = SlotTarget(v.anchor, v.value, imageBase);
                 if (f >= 0 && MatchAt(r, f - r.site)) Accept(i, v.value);
                 continue;
             }
@@ -117,7 +176,6 @@ namespace
         }
     }
 
-    // First byte-exact run of a pattern, for a fast memchr-led search.
     void LongestRun(const kp::KpSiteRow& r, int* start, int* len)
     {
         *start = 0; *len = 0;
@@ -129,22 +187,25 @@ namespace
         }
     }
 
-    // Number of hits of a row's pattern in .text (stops at 2); *hit = the first.
+    // Number of hits of a row's pattern in the file's .text (stops at 2); *hit = the first (RVA).
     int Scan(const kp::KpSiteRow& r, long long* hit)
     {
         int rs, rl;
         LongestRun(r, &rs, &rl);
         if (rl == 0) return 0;
+        const unsigned char* text = At(g_f.textRva, g_f.textEnd - g_f.textRva);
+        if (!text) return 0;
         int n = 0;
-        const unsigned char* p = g_base + g_textRva + rs;
-        const unsigned char* end = g_base + g_textEnd - (r.patLen - rs);
+        const unsigned char* p = text + rs;
+        const unsigned char* end = text + (g_f.textEnd - g_f.textRva) - (r.patLen - rs);
         while (p < end)
         {
             p = static_cast<const unsigned char*>(memchr(p, r.pat[rs], end - p));
             if (!p) break;
-            if (memcmp(p, r.pat + rs, rl) == 0 && MatchAt(r, (p - g_base) - rs))
+            long long rva = g_f.textRva + (p - text) - rs;
+            if (memcmp(p, r.pat + rs, rl) == 0 && MatchAt(r, rva))
             {
-                *hit = (p - g_base) - rs;
+                *hit = rva;
                 if (++n >= 2) break;
             }
             ++p;
@@ -155,10 +216,11 @@ namespace
     struct Hit { long long ref; long long at; int row; };
     bool ByRef(const Hit& a, const Hit& b) { return a.ref < b.ref; }
 
-    // Unknown build: search every pattern; keep unique hits that keep the 1.0.68 order.
+    // Unknown build: search every pattern; keep unique hits that keep the 1.0.68 order and whose
+    // shift agrees with a neighbouring hit's.
     void ResolveUnknown()
     {
-        const int ref = KP_BUILD_COUNT - 1;   // newest measured build is the order reference
+        const int ref = KP_BUILD_COUNT - 1;   // newest measured build is the reference
         std::vector<Hit> hits;
         for (int i = 0; i < KP_SITE_COUNT; ++i)
         {
@@ -170,7 +232,6 @@ namespace
             hits.push_back(h);
         }
         std::sort(hits.begin(), hits.end(), ByRef);
-        // Longest subset whose hit addresses increase with the reference addresses (O(n^2), n < 100s).
         size_t n = hits.size();
         std::vector<int> len(n, 1), prev(n, -1);
         int best = -1;
@@ -180,13 +241,23 @@ namespace
                 if (hits[j].at < hits[i].at && len[j] + 1 > len[i]) { len[i] = len[j] + 1; prev[i] = (int)j; }
             if (best < 0 || len[i] > len[best]) best = (int)i;
         }
-        std::vector<bool> keep(n, false);
-        for (int k = best; k >= 0; k = prev[k]) keep[k] = true;
-        for (size_t k = 0; k < n; ++k)
+        std::vector<Hit> kept;
+        for (int k = best; k >= 0; k = prev[k]) kept.push_back(hits[k]);
+        std::reverse(kept.begin(), kept.end());
+        for (size_t k = 0; k < kept.size(); ++k)
         {
-            if (!keep[k]) { kp::Log("sites: %s dropped (out of order)", kp::g_sites[hits[k].row].name); continue; }
-            Accept(hits[k].row, ReadValue(kp::g_sites[hits[k].row], hits[k].at));
+            long long s = kept[k].at - kept[k].ref;
+            bool fits = false;
+            if (k > 0) fits = fits || _abs64(s - (kept[k - 1].at - kept[k - 1].ref)) <= kShiftSlack;
+            if (k + 1 < kept.size()) fits = fits || _abs64(s - (kept[k + 1].at - kept[k + 1].ref)) <= kShiftSlack;
+            if (!fits && kept.size() > 1)
+            {
+                kp::Log("sites: %s dropped (shift 0x%llx fits no neighbour)", kp::g_sites[kept[k].row].name, s);
+                continue;
+            }
+            Accept(kept[k].row, ReadValue(kp::g_sites[kept[k].row], kept[k].at));
         }
+        if (kept.size() < n) kp::Log("sites: %u of %u unique hits dropped (out of order)", (unsigned)(n - kept.size()), (unsigned)n);
     }
 }
 
@@ -200,17 +271,25 @@ extern "C" void KpTrapHit(int row)
 
 namespace kp
 {
-    bool SitesResolve(const char* exeSha256)
+    bool SitesResolve(const wchar_t* exePath, const char* exeSha256)
     {
-        for (int i = 0; i < KP_SITE_COUNT; ++i) { g_ok[i] = false; g_addr[i] = NULL; g_fieldOff[i] = kFieldTrap; }
-        if (!FindText()) { Log("sites: no .text section in the exe"); return false; }
+        for (int i = 0; i < KP_SITE_COUNT; ++i) { g_ok[i] = false; g_addr[i] = NULL; g_value[i] = 0; g_fieldOff[i] = kFieldTrap; }
+        g_base = reinterpret_cast<unsigned char*>(GetModuleHandleW(NULL));
         g_build = -1;
         for (int b = 0; b < KP_BUILD_COUNT; ++b)
             if (exeSha256 && strcmp(exeSha256, g_builds[b].sha256) == 0) g_build = b;
 
+        HANDLE file = INVALID_HANDLE_VALUE, map = NULL;
         ULONGLONG t0 = GetTickCount64();
-        if (g_build >= 0) ResolveKnown(); else ResolveUnknown();
+        bool mapped = exePath && MapExe(exePath, &file, &map);
+        if (!mapped) Log("sites: cannot read the exe file %ls - nothing resolved", exePath ? exePath : L"(none)");
+        else if (g_build >= 0) ResolveKnown();
+        else ResolveUnknown();
         ULONGLONG ms = GetTickCount64() - t0;
+        if (g_f.view) UnmapViewOfFile(g_f.view);
+        if (map) CloseHandle(map);
+        if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
+        ZeroMemory(&g_f, sizeof(g_f));
 
         int ok = 0;
         for (int i = 0; i < KP_SITE_COUNT; ++i) if (g_ok[i]) ++ok;
@@ -248,6 +327,7 @@ namespace kp
     bool SitesKnownBuild() { return g_build >= 0; }
     bool SiteOk(int id) { return id >= 0 && id < KP_SITE_COUNT && g_ok[id]; }
     void* SiteAddress(int id) { return SiteOk(id) ? g_addr[id] : NULL; }
+    long long SiteValue(int id) { return SiteOk(id) ? g_value[id] : -1; }
 
     bool FeatureOn(const char* feature)
     {

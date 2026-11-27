@@ -4,6 +4,8 @@
 
 #include <stddef.h>
 
+#include "kp_sites_gen.h"   // KP_SITE_COUNT, KpSiteId, KP_BUILD_COUNT, KP_FEATURE_COUNT
+
 namespace kp
 {
     enum KpSiteKind { SK_CODE, SK_GLOBAL, SK_FIELD, SK_VSLOT, SK_PATCH, SK_CALLSITE, SK_DATA };
@@ -29,11 +31,10 @@ namespace kp
         int site;                    // offset of the site inside the pattern
         int read;                    // KpRead
         int readA, readB;            // rip: disp offset, instruction length; disp: offset, size
-        KpBuildValue builds[2];      // in g_builds order
+        KpBuildValue builds[KP_BUILD_COUNT];   // in g_builds order
     };
 }
 
-#include "kp_sites_gen.h"   // KP_SITE_COUNT, KpSiteId, KP_BUILD_COUNT, KP_FEATURE_COUNT
 
 namespace kp
 {
@@ -46,14 +47,16 @@ namespace kp
     extern ptrdiff_t g_fieldOff[KP_SITE_COUNT];
     const ptrdiff_t kFieldTrap = (ptrdiff_t)0x4000000000000000LL;
 
-    // Resolves every row for the running exe (its SHA-256 as hex). Logs build, rows and features.
-    // Returns false if a required row is unresolved (KenshiPure must stay inactive).
-    bool SitesResolve(const char* exeSha256);
+    // Resolves every row for the running exe: patterns are checked in the exe file at exePath (its
+    // SHA-256 as hex picks the build; NULL or an unknown hash = pattern search). Addresses point into
+    // the loaded exe. Logs build, rows and features. Returns false if a required row is unresolved.
+    bool SitesResolve(const wchar_t* exePath, const char* exeSha256);
 
     const char* SitesBuildName();     // "1.0.65", "1.0.68", or "unknown"
     bool SitesKnownBuild();
     bool SiteOk(int id);
     void* SiteAddress(int id);        // absolute address (code/global/data/patch/callsite), NULL if unresolved
+    long long SiteValue(int id);      // resolved RVA / offset / slot offset, -1 if unresolved
     bool FeatureOn(const char* feature);   // e.g. "optional:probe"; "required" is on when SitesResolve passed
     template <typename T> T* SiteGlobal(int id) { return static_cast<T*>(SiteAddress(id)); }
 

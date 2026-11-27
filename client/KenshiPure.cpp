@@ -1,5 +1,5 @@
 // KenshiPure client plugin: build check, address layer, per-frame hook, live probe.
-// Started by RE_Kenshi from mods/KenshiPure/ (RE_Kenshi.json, startPlugin). Built with KenshiLib
+// Started by KenshiPureLoader.dll (an Ogre plugin) through kpStart (KpHost.h). Built with KenshiLib
 // 0.5.0's headers (declarations only; KenshiLib is not linked or loaded) and the VC++ 2010 (v100)
 // x64 toolset, /MD, so every C++ object crossing into Kenshi has Kenshi's own layout and heap.
 // Addresses: our own table client/sites.tsv (Sites.h). See docs/client.md.
@@ -10,6 +10,7 @@
 #include <string>
 
 #include "Game.h"
+#include "KpHost.h"
 #include "Hooks.h"
 #include "Log.h"
 #include "Display.h"
@@ -36,58 +37,14 @@ namespace
 
     // ---------------------------------------------------------------- build check
 
-    bool Sha256File(const wchar_t* path, char out[65], unsigned long long* size)
+    // Resolves the address table for the exe the loader hashed. Returns false if we must stay
+    // inactive (a required row is unresolved).
+    bool BuildCheck(const KpHost* host)
     {
-        bool ok = false;
-        BCRYPT_ALG_HANDLE alg = NULL;
-        BCRYPT_HASH_HANDLE hash = NULL;
-        HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
-                               OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-        if (f == INVALID_HANDLE_VALUE) return false;
-        *size = 0;
-        if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0) == 0 &&
-            BCryptCreateHash(alg, &hash, NULL, 0, NULL, 0, 0) == 0)
-        {
-            static unsigned char buf[1 << 16];
-            DWORD got = 0;
-            ok = true;
-            while (ReadFile(f, buf, sizeof(buf), &got, NULL) && got > 0)
-            {
-                *size += got;
-                if (BCryptHashData(hash, buf, got, 0) != 0) { ok = false; break; }
-            }
-            unsigned char digest[32];
-            if (ok && BCryptFinishHash(hash, digest, sizeof(digest), 0) == 0)
-            {
-                static const char hex[] = "0123456789abcdef";
-                for (int i = 0; i < 32; ++i) { out[2 * i] = hex[digest[i] >> 4]; out[2 * i + 1] = hex[digest[i] & 15]; }
-                out[64] = 0;
-            }
-            else ok = false;
-        }
-        if (hash) BCryptDestroyHash(hash);
-        if (alg) BCryptCloseAlgorithmProvider(alg, 0);
-        CloseHandle(f);
-        return ok;
-    }
-
-    // Logs exe path, size and hash, then resolves the address table for this exe.
-    // Returns false if we must stay inactive (a required row is unresolved).
-    bool BuildCheck()
-    {
-        wchar_t exe[MAX_PATH];
-        DWORD n = GetModuleFileNameW(NULL, exe, MAX_PATH);
-        if (n == 0 || n >= MAX_PATH) { kp::Log("build: cannot read the exe path"); return false; }
-        char exeUtf8[MAX_PATH * 3];
-        WideCharToMultiByte(CP_UTF8, 0, exe, -1, exeUtf8, sizeof(exeUtf8), NULL, NULL);
-        kp::Log("build: exe %s", exeUtf8);
-
-        char sha[65] = "";
-        unsigned long long size = 0;
-        if (Sha256File(exe, sha, &size)) kp::Log("build: exe size %llu, sha256 %s", size, sha);
-        else kp::Log("build: could not hash the exe");
-
-        if (!kp::SitesResolve(sha[0] ? sha : NULL))
+        char exeUtf8[MAX_PATH * 3] = "?";
+        if (host->exePath) WideCharToMultiByte(CP_UTF8, 0, host->exePath, -1, exeUtf8, sizeof(exeUtf8), NULL, NULL);
+        kp::Log("build: exe %s, sha256 %s", exeUtf8, host->exeSha256 && host->exeSha256[0] ? host->exeSha256 : "unknown");
+        if (!kp::SitesResolve(host->exePath, host->exeSha256 && host->exeSha256[0] ? host->exeSha256 : NULL))
         {
             kp::Log("build: a required address is unresolved - staying inactive");
             return false;
@@ -228,27 +185,44 @@ namespace
     }
 }
 
-// RE_Kenshi finds this by its C++ name (?startPlugin@@YAXXZ); do not make it extern "C".
-__declspec(dllexport) void startPlugin()
+// Called by KenshiPureLoader.dll (the Ogre plugin) while Ogre builds its Root, before the game window
+// exists. Returns 1 when active.
+extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
 {
     kp::LogOpen();
     kp::Log("KenshiPure " KP_VERSION " loaded (built " __DATE__ " " __TIME__ ", MSVC %d)", _MSC_FULL_VER);
+    if (!host || host->version != KP_HOST_VERSION || host->size < sizeof(KpHost))
+    {
+        kp::Log("host: loader interface version %u (size %u) - this KenshiPure needs version %d; staying inactive",
+                host ? host->version : 0, host ? host->size : 0, KP_HOST_VERSION);
+        return 0;
+    }
+    kp::Log("host: %s; display fix %s", host->loaderBuild ? host->loaderBuild : "?",
+            host->displayHook ? "armed early by the loader" : "not armed by the loader");
     AddVectoredExceptionHandler(0, OnException);
 
     if (AnarchyLoaded())
     {
         kp::Log("AnarchyKenshi is loaded in this game - staying inactive (switch it off for KenshiPure runs)");
-        return;
+        return 0;
     }
-    kp::DisplayFixStart();  // window calls only; independent of the game build
-    if (!BuildCheck()) return;
+    kp::DisplayFixStart();  // fallback minimize-restore; acts only if the picture is still the wrong size
+    if (!BuildCheck(host)) return 0;
+    if (!kp::SitesKnownBuild())
+    {
+        // A pattern hit in an unmeasured build is not proof enough to patch code: a wrong hit would
+        // put a detour into the wrong function. Only the loader's display fix runs there.
+        kp::Log("build: unknown build - no game hooks; only the display fix runs");
+        return 0;
+    }
 
     if (!kp::OnFrame(&OnFrame) || !kp::FrameHookInstall())
     {
         kp::Log("frame: hook FAILED - staying inactive");
-        return;
+        return 0;
     }
     kp::Log("frame: hook installed; waiting for the first frame");
     if (kp::FeatureOn("optional:probe")) kp::ProbeStart();
     else kp::Log("probe: off (its addresses are not all resolved for this build)");
+    return 1;
 }

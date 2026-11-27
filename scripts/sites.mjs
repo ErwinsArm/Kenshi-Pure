@@ -150,8 +150,27 @@ function neighbourShift(kl, e65, e68, rva) {
   return { before, after };
 }
 
-// Throws unless anchor a68 has its neighbours' block shift and keeps their order.
-function shiftCheck(kl, e65, e68, a65, a68) {
+// Whole function bodies equal? Decodes both up to the first int3 (padding) and compares every
+// instruction's bytes with moving operands (rel32 targets, RIP-relative displacements) masked.
+// Returns the instruction count, or throws on the first difference.
+export function sameBody(e65, e68, f65, f68, max = 0x8000) {
+  const a = decodeAt(e65, f65, max), b = decodeAt(e68, f68, max);
+  const end = (l) => { const i = l.findIndex((x) => x.mnemonic === loadIced(REPO).Mnemonic.Int3); return i < 0 ? l.length : i; };
+  const na = end(a), nb = end(b);
+  if (na !== nb) throw new Error(`body differs: ${na} vs ${nb} instructions`);
+  for (let i = 0; i < na; i++) {
+    if (a[i].len !== b[i].len || a[i].mnemonic !== b[i].mnemonic) throw new Error(`body differs at instruction ${i} (${hex(a[i].rva)} / ${hex(b[i].rva)})`);
+    const ma = maskFor([a[i]], a[i].rva, a[i].len), ba = e65.bytes(a[i].rva, a[i].len), bb = e68.bytes(b[i].rva, b[i].len);
+    for (let k = 0; k < a[i].len; k++) if (ma[k] && ba[k] !== bb[k]) throw new Error(`body differs at instruction ${i} (${hex(a[i].rva)} / ${hex(b[i].rva)})`);
+  }
+  if (na === 0 || na >= a.length) throw new Error("body end (int3) not found");
+  return na;
+}
+
+// Throws unless anchor a68 has its neighbours' block shift and keeps their order. For a function
+// start (isFunction), a shift between the two neighbour blocks is also accepted when the whole body
+// is identical in both exes.
+function shiftCheck(kl, e65, e68, a65, a68, isFunction = false) {
   const { before, after } = neighbourShift(kl, e65, e68, a65);
   const s = a68 - a65;
   const side = (l) => l.length >= 2 && l.every((x) => x.shift === s);
@@ -167,8 +186,10 @@ function shiftCheck(kl, e65, e68, a65, a68) {
   // +0xb90 between neighbours at +0xb40 and +0xba0). Then: each side's neighbours agree among
   // themselves and the anchor lies between the nearest ones in both exes.
   const agree = (l) => l.length >= 2 && l.every((x) => x.shift === l[0].shift);
-  if (agree(before) && agree(after) && s >= Math.min(before[0].shift, after[0].shift) && s <= Math.max(before[0].shift, after[0].shift))
-    return `shift ${hex(s)} between its neighbours' blocks (before ${describe(before)}; after ${describe(after)}), order kept`;
+  if (isFunction && agree(before) && agree(after) && s >= Math.min(before[0].shift, after[0].shift) && s <= Math.max(before[0].shift, after[0].shift)) {
+    const n = sameBody(e65, e68, a65, a68);
+    return `shift ${hex(s)} between its neighbours' blocks (before ${describe(before)}; after ${describe(after)}), order kept, whole body identical (${n} instructions)`;
+  }
   throw new Error(`shift ${hex(s)} at ${hex(a65)} does not fit its neighbours (before ${describe(before)}, after ${describe(after)})`);
 }
 
@@ -230,7 +251,7 @@ function proveRow(spec, ctx) {
   if (spec.kind === "code") {
     const a65 = kl.get(spec.sym).rva;
     const { pat, hits } = makePattern(e65, e68, a65);
-    ev.push(`65: KenshiLib map`, `68: ${shiftCheck(kl, e65, e68, a65, hits[0])}`);
+    ev.push(`65: KenshiLib map`, `68: ${shiftCheck(kl, e65, e68, a65, hits[0], true)}`);
     Object.assign(row, { "1.0.65": cell(a65), "1.0.68": cell(hits[0]), pattern: formatPattern(pat), site: "0", read: "" });
   } else if (spec.kind === "global" || spec.kind === "data") {
     const target = kl.get(spec.sym).rva;
@@ -278,7 +299,7 @@ function proveRow(spec, ctx) {
     if (vt65 === null || vt68 === null) throw new Error(`RTTI vtable of ${spec.type} not found`);
     if (e65.vtableSlot(vt65, off) !== f65) throw new Error(`65: vtable ${spec.type}+${hex(off)} is ${hex(e65.vtableSlot(vt65, off))}, KenshiLib says ${hex(f65)}`);
     const { pat, hits } = makePattern(e65, e68, f65);
-    const s = shiftCheck(kl, e65, e68, f65, hits[0]);
+    const s = shiftCheck(kl, e65, e68, f65, hits[0], true);
     if (e68.vtableSlot(vt68, off) !== hits[0]) throw new Error(`68: vtable ${spec.type}+${hex(off)} is ${hex(e68.vtableSlot(vt68, off))}, the function matched at ${hex(hits[0])}`);
     ev.push(`65: header slot; vtable ${spec.type} slot = KenshiLib's ${hex(f65)}`, `68: slot holds the matched function (${s})`);
     Object.assign(row, { sym: `${cls}|${method}|${spec.sym}|${spec.type}`, "1.0.65": cell(off, vt65), "1.0.68": cell(off, vt68), pattern: formatPattern(pat), site: "0", read: "vt" });
@@ -345,6 +366,7 @@ function cmdCheck(args) {
   const t = readTable();
   const ctx = context(args, t);
   let bad = 0;
+  const only = [];
   const names = new Set();
   for (const row of t.rows) {
     const errs = [];
@@ -364,9 +386,10 @@ function cmdCheck(args) {
       }
     } catch (e) { errs.push(e.message); }
     if (errs.length) { bad++; console.log(`FAIL ${row.name}: ${errs.join("; ")}`); }
+    else if (t.builds.some((b) => !row[b.label])) { only.push(row.name); console.log(`ok   ${row.name} (${t.builds.filter((b) => row[b.label]).map((b) => b.label).join(", ")} only; unresolved elsewhere)`); }
     else console.log(`ok   ${row.name}`);
   }
-  console.log(`${t.rows.length - bad}/${t.rows.length} rows proven in both exes`);
+  console.log(`${t.rows.length - bad - only.length}/${t.rows.length} rows proven in both exes, ${only.length} in one build only (${only.join(", ") || "-"}), ${bad} failed`);
   if (bad) process.exit(1);
 }
 
@@ -377,6 +400,11 @@ const cStr = (s) => JSON.stringify(s);
 
 export function generate(t) {
   const rows = t.rows;
+  // Writes need a row proven in every measured build (plan: "Writes need a row whose evidence says
+  // both builds proven"): a "-write" feature row with an empty build cell is refused.
+  for (const r of rows)
+    if (/-write$/.test(r.need) && t.builds.some((b) => !r[b.label]))
+      throw new Error(`${r.name} belongs to ${r.need} but is not proven in every build`);
   const feats = ["required", ...new Set(rows.map((r) => r.need).filter((n) => n !== "required"))];
   const fields = rows.filter((r) => r.kind === "field");
   const thunks = rows.filter((r) => r.kind === "code" && r.sym);

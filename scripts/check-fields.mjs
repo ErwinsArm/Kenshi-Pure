@@ -2,7 +2,9 @@
 // Build check: KenshiPure's sources may touch game fields only through KP_FIELD (client/Sites.h),
 // whose offset comes from client/sites.tsv per build. It fails on
 //   (a) `v->m` / `v.m` where v is declared in the same file with a Kenshi class type, and
-//   (b) a chained `)->m`, `).m`, `]->m`, `].m` (after KP_FIELD(...), a call or an index),
+//   (b) a chained `)->m` or `]->m` (a call, cast or index result: `c->getMedical()->blood`,
+//       `((MedicalSystem*)v)->blood`, `list[0]->money`), and `).m` / `].m` on a line with KP_FIELD,
+//   (c) `v->m` / `v.m` where v is declared with `auto` from an expression naming a Kenshi class,
 // when m is a data member of a Kenshi class in KenshiLib's headers (Include/kenshi, "// 0x.. Member").
 // A line whose access is not a game field (an own struct or an Ogre type that shares the name) ends
 // with `// kp-not-game: <why>`.
@@ -54,13 +56,17 @@ export function check(text, { names, classes }) {
     const code = strip(line);
     const decls = [];
     for (const m of code.matchAll(DECL_RE)) if (classes.has(m[2]) && m[3] !== m[2]) decls.push(m[3]);
+    for (const m of code.matchAll(/\bauto\s*[*&]*\s*(\w+)\s*=([^;]*)/g))
+      if ([...m[2].matchAll(/\b(\w+)\b/g)].some((w) => classes.has(w[1]))) decls.push(m[1]);
     const head = code.includes("(") && !/;\s*$/.test(code);
     if (head) decls.forEach((d) => pending.add(d)); else decls.forEach((d) => scopes[scopes.length - 1].add(d));
     if (!/\/\/\s*kp-not-game:/.test(line)) {
       for (const m of code.matchAll(ACCESS_RE)) {
         const [, root, , member] = m;
         if (!names.has(member)) continue;
-        const chained = (root === ")" || root === "]") && /KP_FIELD\s*\(/.test(code);
+        // `)->m` / `]->m` always (call, cast or index result); `).m` / `].m` only next to KP_FIELD,
+        // since own arrays of own structs (`rows[i].name`) are common.
+        const chained = (root === ")" || root === "]") && (m[2] === "->" || /KP_FIELD\s*\(/.test(code));
         if (chained || isGameVar(root) || pending.has(root)) out.push({ line: i + 1, member, text: line.trim() });
       }
     }

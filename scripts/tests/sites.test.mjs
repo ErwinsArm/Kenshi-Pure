@@ -50,3 +50,19 @@ test("check-fields: raw access through game-typed variables is refused, own stru
   ].join("\n");
   assert.deepEqual(check(src, members).map((h) => h.line), [4, 7]);
 });
+
+test("check-fields: chained, cast, indexed and auto accesses are refused", () => {
+  const members = { names: new Set(["blood", "money"]), classes: new Set(["MedicalSystem", "Character"]) };
+  const src = [
+    "void f(Character* c, void* v, Character** cs)",
+    "{",
+    "    float a = c->getMedical()->blood;",
+    "    float b = ((MedicalSystem*)v)->blood;",
+    "    float d = static_cast<MedicalSystem*>(v)->blood;",
+    "    int e = cs[0]->money;",
+    "    auto m2 = (MedicalSystem*)v;",
+    "    float g = m2->blood;",
+    "}",
+  ].join("\n");
+  assert.deepEqual(check(src, members).map((h) => h.line), [3, 4, 5, 6, 8]);
+});

@@ -51,15 +51,15 @@ namespace
 
 namespace kp
 {
-    void LogOpen()
+    void LogOpen(const wchar_t* name)
     {
         if (g_ready) return;
         InitializeCriticalSection(&g_lock);
         g_start = GetTickCount64();
         FindPluginDir();
         wchar_t path[MAX_PATH], prev[MAX_PATH];
-        _snwprintf_s(path, MAX_PATH, _TRUNCATE, L"%sKenshiPure.log", g_dir);
-        _snwprintf_s(prev, MAX_PATH, _TRUNCATE, L"%sKenshiPure.prev.log", g_dir);
+        _snwprintf_s(path, MAX_PATH, _TRUNCATE, L"%s%s.log", g_dir, name);
+        _snwprintf_s(prev, MAX_PATH, _TRUNCATE, L"%s%s.prev.log", g_dir, name);
         MoveFileExW(path, prev, MOVEFILE_REPLACE_EXISTING);
         g_file = _wfsopen(path, L"w", _SH_DENYWR);
         g_ready = true;
