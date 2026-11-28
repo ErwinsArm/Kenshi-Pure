@@ -109,6 +109,15 @@ Describe "install-client.ps1" {
         Test-Path "$g\mods\KenshiPure\KenshiPureCore.dll" | Should Be $false
     }
 
+    It "removes the stand-in test settings, which would turn the other players' bodies off" {
+        $g = Join-Path $TestDrive "g11"
+        $build = New-FakeGame $g
+        New-Item -ItemType Directory -Force "$g\mods\KenshiPure" | Out-Null
+        [IO.File]::WriteAllText("$g\mods\KenshiPure\KenshiPure.cfg", "host=100.64.0.7`r`nstandin=cycle`r`n standin_snap = 200`r`nremote_range=3000`r`n#standin=cycle`r`n", [Text.Encoding]::ASCII)
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -NoGameCheck | Out-Null
+        [IO.File]::ReadAllText("$g\mods\KenshiPure\KenshiPure.cfg") | Should Be "host=100.64.0.7`r`nremote_range=3000`r`n#standin=cycle`r`nport=27850`r`nname=player`r`n"
+    }
+
     It "refuses to install without the core DLL" {
         $g = Join-Path $TestDrive "g7"
         $build = New-FakeGame $g

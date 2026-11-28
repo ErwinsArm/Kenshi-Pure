@@ -287,7 +287,7 @@ at 21:49 in the user's run wrote `autosave1` while it was driven).
   without calls and picked it again; no fault in any run.
 
 **Unattended test** (`scripts/run-game-test.ps1 -GameDir <Kenshi> -Save <name>`): starts server and bot, sets
-`kenshi.cfg` windowed, writes `modsKenshiPureautoload.txt`, starts Kenshi through Steam; the plugin
+`kenshi.cfg` windowed, writes `mods\KenshiPure\autoload.txt`, starts Kenshi through Steam; the plugin
 (`client/AutoLoad.cpp`) reads and deletes the file, presses OK in Kenshi's start dialog, moves the game window
 to a non-primary monitor and asks `SaveManager::load(name)` through a message posted to the game window (our
 frame hook and an Ogre frame listener do not run at the main menu, **M**); after the given seconds the script
@@ -460,20 +460,26 @@ only their `.pdb` file, **M**: no user path left in the three DLLs).
   `libraryfolders.vdf`.
 - Before installing it hashes the exe the game will run (RE_Kenshi's copy while `Plugin=RE_Kenshi` is on, else
   `kenshi_x64.exe`) and stops without changes when the build is not one of `builds.txt` / `sites.tsv`.
+- Removes `standin*` lines from `KenshiPure.cfg`: the M4 stand-in tool turns the remote bodies off, and the test
+  runs do not show a leftover line (`run-game-test.ps1` drops it for the run) (**M**: an M4 `standin=cycle` line had
+  stayed through later installs).
 - Unblocks the copied DLLs (the "from the internet" mark of a downloaded zip); `-Cheats` is refused without a cheat
-  DLL. Pester tests: 11 (`scripts/tests`), including a package folder against a fake Kenshi folder.
+  DLL. Pester tests: 12 (`scripts/tests`), including a package folder against a fake Kenshi folder.
 
 Steps for the two people: [playing-together.md](playing-together.md).
 
-**Runs (M)**, 0.0.8-m6 installed from the package (host 127.0.0.1), `scripts/run-game-test.ps1 -SaveCopy -Steps "at=20 speed
-3;at=30 pause x;at=40 unpause x;at=55 save SAVE NAME"`, save "MP TEST", bot 60 units/s:
+**Runs (M)**, 0.0.8-m6 with loader 0.0.4-m3, installed from the package (host 127.0.0.1),
+`scripts/run-game-test.ps1 -SaveCopy -Steps "at=20 speed 3;at=30 pause x;at=40 unpause x;at=55 save SAVE
+NAME;at=150 quit"`, save "MP TEST", bot 60 units/s:
 
-| Run | Build | welcomed | lock | x3 step | pause step | save | body gap mean |
-|---|---|---|---|---|---|---|---|
-| A | 1.0.65 (RE_Kenshi) | 0.2 s after start | on the first connected frame | kept at x1, no speed change after | blocked (another caller) | skipped our squad | 50.2 (133 lines) |
-| B | 1.0.68 (`-NoReKenshi`, Steam's exe) | 0.2 s | same | same | same | same | 46.8 (130 lines) |
+| Run | Build | welcomed | lock | x3 step | pause step | save | body gap mean | quit |
+|---|---|---|---|---|---|---|---|---|
+| A | 1.0.65 (RE_Kenshi) | 0.2 s after start | on the first connected frame | kept at x1 | blocked (another caller) | skipped our squad | 53.8 | clean |
+| B | 1.0.68 (`-NoReKenshi`, Steam's exe) | 0.4 s | same | same | same | same | 51.6 | clean |
 
-No exception in either run; `Plugins_x64.cfg` came back with its RE_Kenshi line. Not covered by a run: the pause key,
+"Clean" quit: the loader stopped KenshiPure after the render loop, the body was forgotten without a game call, the
+server logged `player 2 left (left)`, exit code 1, no new crash dump. No snap and no exception in either run;
+`Plugins_x64.cfg` came back with its RE_Kenshi line. Not covered by a run: the pause key,
 the speed buttons, a dialogue, the build mode and a new game's character editor (they need a player), two real
 clients (G9: Steam starts one Kenshi per PC and both would write the same log; not tried).
 

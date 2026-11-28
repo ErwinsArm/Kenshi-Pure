@@ -77,8 +77,7 @@ if (Test-Path $kpBackup) { Move-Item $kpBackup $kpCfg -Force; Write-Host "restor
 if (Test-Path $pluginsBackup) { Move-Item $pluginsBackup $plugins -Force; Write-Host "restored Plugins_x64.cfg left over by an aborted run" }
 Remove-Item (Join-Path $mod "autoload.txt") -ErrorAction SilentlyContinue
 Remove-SaveCopy
-# Only our test copies (build
-et\Release): a real server the host started from the package keeps running.
+# Only our test copies (build\net\Release): a real server the host started from the package keeps running.
 $netRelease = Join-Path $net "Release"
 Get-Process kp-server, kp-bot -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($netRelease, [StringComparison]::OrdinalIgnoreCase) } |
     Stop-Process -Force -Confirm:$false

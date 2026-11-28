@@ -19,8 +19,9 @@
 #                                  network lines host=127.0.0.1, port=27850, name=player are added when
 #                                  missing (lines already there, e.g. another server, are kept);
 #                                  probe_write=1 is there only with -ProbeWrite (the live game probe may
-#                                  heal, teleport and spawn items); KenshiPureCheats.dll (+ .pdb, the
-#                                  cheat window) only with -Cheats, else removed
+#                                  heal, teleport and spawn items); standin* lines (a test tool that turns
+#                                  the other players' bodies off) are removed; KenshiPureCheats.dll (+ .pdb,
+#                                  the cheat window) only with -Cheats, else removed
 #   <game>\Plugins_x64.cfg         adds / removes "Plugin=mods/KenshiPure/KenshiPureLoader" (right after
 #                                  "Plugin=RE_Kenshi" if that is there, else before the first Plugin= line);
 #                                  removes / restores AnarchyKenshi's "Plugin=mods/AnarchyKenshi/AnarchyLoader";
@@ -213,8 +214,9 @@ if (-not $Uninstall) {
     }
     # Downloaded files carry Windows' "from the internet" mark; the game should load ours without asking.
     foreach ($f in @(Get-ChildItem -LiteralPath $modDir -Filter *.dll)) { try { Unblock-File -LiteralPath $f.FullName } catch { } }
-    # KenshiPure.cfg: keep every line except probe_write, which follows -ProbeWrite; host/port/name given to this
-    # script replace theirs; missing network lines are added.
+    # KenshiPure.cfg: keep every line except probe_write (follows -ProbeWrite) and the standin* test keys (the
+    # stand-in tool turns the other players' bodies off); host/port/name given to this script replace theirs;
+    # missing network lines are added.
     $cfg = Join-Path $modDir "KenshiPure.cfg"
     $set = @{}
     if ($ServerHost) { $set["host"] = $ServerHost }
@@ -222,7 +224,10 @@ if (-not $Uninstall) {
     if ($PlayerName) { $set["name"] = $PlayerName }
     $lines = @()
     if (Test-Path -LiteralPath $cfg) {
-        foreach ($l in @(Get-Content -LiteralPath $cfg | Where-Object { $_ -notmatch '^\s*probe_write\s*=' })) {
+        $kept = @(Get-Content -LiteralPath $cfg | Where-Object { $_ -notmatch '^\s*probe_write\s*=' })
+        $test = @($kept | Where-Object { $_ -match '^\s*standin\w*\s*=' })
+        if ($test.Count -gt 0) { Write-Host "Removed test settings from KenshiPure.cfg: $($test -join ', ')" }
+        foreach ($l in @($kept | Where-Object { $_ -notmatch '^\s*standin\w*\s*=' })) {
             if ($l -match '^\s*(host|port|name)\s*=' -and $set.ContainsKey($Matches[1])) { $k = $Matches[1]; $l = "$k=$($set[$k])"; $set.Remove($k) }
             $lines += $l
         }

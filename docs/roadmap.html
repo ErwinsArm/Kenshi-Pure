@@ -108,8 +108,8 @@ h2{font-size:1.25rem}
 // Edit this object to update the page. status: done | now | todo
 const DATA = {
   updated: "28 November 2026",
-  now: "M6 is ready for your test with a friend: an install package for your friend (double-click to install, it finds Kenshi and asks for the server address and a name), the server for your PC, and plain steps for both of you. While you are connected the game always runs at x1 and nobody can pause (your rule); the cheat window switches itself off. Two automatic test runs passed, one with your Kenshi version and one with the version your friend probably has.",
-  you: "Play the test with your friend: the steps are in docs/playing-together.md, the package is build/package/KenshiPure-0.0.8-m6.zip. Afterwards tell Claude what you saw and send the logs (your friend's KenshiPure.log too).",
+  now: "M6 is ready for your test with a friend: an install package for your friend (double-click to install, it finds Kenshi and asks for the server address and a name), the server for your PC, and plain steps for both of you. While you are connected the game always runs at x1 and nobody can pause (your rule); the cheat window switches itself off. The final version passed two automatic test runs, one with your Kenshi version and one with the version your friend probably has, including closing the game. It is already installed on your PC; an old test setting that would have hidden your friend's character was removed.",
+  you: "Play the test with your friend: the steps are in docs/playing-together.md, the file for your friend is build/package/KenshiPure-0.0.8-m6.zip (if you sent them one before, send this new one). Afterwards tell Claude what you saw and send the logs (your friend's KenshiPure.log too).",
   phases: [
     {name:"Learn from the old mod", note:"Read AnarchyKenshi to learn how a Kenshi multiplayer works. We only look; we never copy or run its files.", steps:[
       {tag:"L1", name:"How it talks to the server", status:"done", d:"All ~60 message types and the login are known."},
