@@ -197,6 +197,9 @@ namespace
         void RemoteForgetAll() { bodies.clear(); }
         void RemoteSweep() { Call(); ++sweeps; }
         int sweeps = 0;
+        // Loaded zones: x below loadedMaxX is loaded (0 = all loaded).
+        int RemoteLoadedAt(const float* pos) { Call(); return loadedMaxX == 0.0f || pos[0] < loadedMaxX ? 1 : 0; }
+        float loadedMaxX = 0.0f;
 
         // Walk the bodies toward their destination for dt seconds (min(asked, max) speed).
         void Simulate(float dt)
@@ -299,11 +302,11 @@ namespace
         RemoteConfig c;
         RemoteParseConfig("", &c);
         CHECK(c.on == 1 && c.drive == DM_AUTO && std::strcmp(c.faction, "nofac") == 0 && c.maxSpeed == 150.0f);
-        CHECK(c.range == 3000.0f && c.settleMs == 3000 && c.squadPermanent == 1 && c.snapDist == 300.0f && c.saveGuard == 1);
+        CHECK(c.range == 3000.0f && c.settleMs == 3000 && c.squadPermanent == 0 && c.snapDist == 300.0f && c.saveGuard == 1);
         RemoteParseConfig("remote=off\nremote_drive=steer\nremote_faction= Drifters \nremote_maxspeed=0\nremote_range=500\n"
-                          "remote_settle=10\nremote_squad_permanent=0\nremote_snap=150\nremote_save_guard=off\n", &c);
+                          "remote_settle=10\nremote_squad_permanent=1\nremote_snap=150\nremote_save_guard=off\n", &c);
         CHECK(c.on == 0 && c.drive == DM_STEER && std::strcmp(c.faction, "Drifters") == 0 && c.maxSpeed == 0.0f);
-        CHECK(c.range == 500.0f && c.settleMs == 10000 && c.squadPermanent == 0 && c.snapDist == 150.0f && c.saveGuard == 0);
+        CHECK(c.range == 500.0f && c.settleMs == 10000 && c.squadPermanent == 1 && c.snapDist == 150.0f && c.saveGuard == 0);
         RemoteParseConfig("remote=maybe\nremote_drive=fly\nremote_maxspeed=5\nremote_range=1\nremote_settle=-3\n#remote=off\n", &c);
         CHECK(c.on == 1 && c.drive == DM_AUTO && c.maxSpeed == 150.0f && c.range == 3000.0f && c.settleMs == 3000);
     }
@@ -577,6 +580,33 @@ namespace
             Run(nf, g, now, 20000, ws);
             b = nf.Bodies().Find(7);
             CHECK(b && b->switches >= 2);   // close again: back to steering at least once
+            nf.Stop();
+            g_core.poses.clear();
+        }
+        {   // zones: no spawn while the remote stands outside the loaded zones; a live body that stays outside for 1 s is
+            // removed by us (before the game would unload it), and comes back once the pose is inside again
+            FakeGame g;
+            NetFrame nf;
+            nf.SetRemote(Cfg());
+            CHECK(nf.Start(&api, cc, &g));
+            Walker w(7);
+            std::vector<Walker*> ws(1, &w);
+            g.loadedMaxX = -1000.0f;   // the whole circle (x -200..200) is outside
+            PushEvent(KP_EV_JOINED, 7, "bob");
+            Run(nf, g, now, 6000, ws);
+            CHECK(g.spawns == 0 && g.Logged("outside the loaded zones"));
+            g.loadedMaxX = 0.0f;
+            Run(nf, g, now, 1000, ws);
+            CHECK(g.spawns == 1 && g.Live() == 1);
+            int destroysBefore = g.destroys;
+            g.loadedMaxX = -1000.0f;
+            Run(nf, g, now, 500, ws);
+            CHECK(g.destroys == destroysBefore);   // not yet: under 1 s outside
+            Run(nf, g, now, 1500, ws);
+            CHECK(g.destroys == destroysBefore + 1 && g.Logged("it left the loaded zones"));
+            g.loadedMaxX = 0.0f;
+            Run(nf, g, now, 8000, ws);
+            CHECK(g.spawns == 2 && g.Live() == 1);
             nf.Stop();
             g_core.poses.clear();
         }

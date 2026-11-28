@@ -1,8 +1,9 @@
 // M5 game adapter for remote bodies (Remote.h has the logic): spawns a body with the G3 recipe
-// (docs/findings/remote-bodies.md), keeps one hand per slot (never a pointer across frames), keeps its max
-// speed, carries out drive commands (StandIn.cpp's calls), destroys it, and removes every body right
-// before the game writes a save (SaveManager::saveGame detour). Frame thread only (the save detour runs
-// on the game's main thread too); every game call inside __try. Built with the VC++ 2010 (v100) toolset.
+// (docs/findings/remote-bodies.md) into its own temporary squad, keeps one hand per slot (never a pointer across
+// frames), keeps its max speed, carries out drive commands (StandIn.cpp's calls), destroys it, tells whether a
+// place lies in a loaded zone, and keeps our squads out of every save (Platoon::serialiseEverything detour: the
+// body stays in the world). Frame thread only (saves run on the game's main thread too); every game call inside
+// __try. Built with the VC++ 2010 (v100) toolset.
 #include "RemoteGame.h"
 #include "NetFrame.h"
 #include "StandIn.h"
@@ -18,6 +19,8 @@
 
 #include "Game.h"
 #include <kenshi/Platoon.h>
+#include <kenshi/ZoneManager.h>
+#include <kenshi/FactionRelations.h>
 #include <kenshi/Animation/AnimationClass.h>
 
 namespace
@@ -29,14 +32,27 @@ namespace
     struct Slot
     {
         bool used;
-        bool destroyed;                       // destroy was asked (by us or by the save guard)
+        bool destroyed;                       // destroy was asked
         __declspec(align(16)) char hand[sizeof(hand)];
         char name[64];                        // the body's name as set at spawn
         char faction[64];                     // the faction's name as read back at spawn
     };
     Slot g_slots[KP_SKIP_REMOTE];
-    bool g_saveGuard = false;
-    unsigned int g_savesGuarded = 0;
+
+    // Our squads, kept past their body (an empty squad stays until the game destroys it) so no save writes one. An
+    // entry is only compared by address with the live platoon being saved, then confirmed by that platoon's string
+    // id: our stored pointer is never dereferenced.
+    struct SquadEntry
+    {
+        const void* platoon;
+        char id[64];
+    };
+    enum { kSquads = 64 };
+    SquadEntry g_squads[kSquads];
+    unsigned int g_squadNext = 0;
+    bool g_saveSkip = false;
+    unsigned int g_squadsSkipped = 0;
+    char g_faction[64];                       // cfg faction string id (the stray check)
 
     hand* HandOf(Slot& s) { return reinterpret_cast<hand*>(s.hand); }
     bool SlotOk(int slot) { return slot >= 0 && slot < KP_SKIP_REMOTE && g_slots[slot].used; }
@@ -85,6 +101,104 @@ namespace
     {
         new (s.hand) hand(static_cast<RootObjectBase*>(c));
     }
+    __declspec(noinline) void CopyPlatoonId(Platoon* p, char* out, size_t outSize)
+    {
+        std::string id = p->getPlatoonStringID();
+        _snprintf_s(out, outSize, _TRUNCATE, "%s", id.c_str());
+    }
+    bool PlatoonId(Platoon* p, char* out, size_t outSize)
+    {
+        __try
+        {
+            CopyPlatoonId(p, out, outSize);
+            return out[0] != 0;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            out[0] = 0;
+            return false;
+        }
+    }
+    // 1 permanent, 0 temporary, -1 fault.
+    int PersistentOf(Platoon* p)
+    {
+        __try { return p->isPersistentSquad() ? 1 : 0; }
+        __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+    }
+    bool RememberSquad(Platoon* p, char* id, size_t idSize)
+    {
+        if (!p || !PlatoonId(p, id, idSize)) return false;
+        SquadEntry& e = g_squads[g_squadNext++ % kSquads];
+        e.platoon = p;
+        strcpy_s(e.id, sizeof(e.id), id);
+        return true;
+    }
+
+    // As ActivePlatoon::unloadCheck decides whether a squad stays (1.0.65 0x4fe140, M): no zone map there -> stays;
+    // a loaded (or loading) zone whose bounds minus 170 units of unloaded edges hold the place -> stays; else the
+    // squad unloads after 4.5 s.
+    __declspec(noinline) ZoneMap* ZoneAt(ZoneManager* zm, const float* p)
+    {
+        Ogre::Vector3 v(p[0], p[1], p[2]);
+        return zm->getZoneMap(v);
+    }
+    __declspec(noinline) bool InZoneBounds(ZoneMap* z, const float* p)
+    {
+        // (min x, min z, max x, max z), compared as at 0x4fe259..0x4fe28b.
+        Ogre::Vector4 b = z->getBoundsMinusUnloadedEdges(170.0f);
+        return p[0] >= b.x && b.z >= p[0] && p[2] >= b.y && b.w >= p[2];
+    }
+    int LoadedCalls(GameWorld* gw, const float* p)
+    {
+        __try
+        {
+            ZoneManager* zm = KP_FIELD(gw, GameWorld, zoneMgr);
+            if (!zm) return -1;
+            ZoneMap* z = ZoneAt(zm, p);
+            if (!z) return 1;
+            if (!z->isLoadedMT() && !z->isBeingLoadedMT()) return 0;
+            return InZoneBounds(z, p) ? 1 : 0;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return -1;
+        }
+    }
+
+    // A faction's relation towards another (FactionRelations::getFactionRelation; an NPC counts a faction as an enemy
+    // at <= -30, FactionRelations::isEnemy 1.0.65 0x6b23b3, M). false: no relations object or a fault.
+    bool RelationOf(Faction* from, Faction* to, float* out)
+    {
+        __try
+        {
+            FactionRelations* r = KP_FIELD(from, Faction, relations);
+            if (!r) return false;
+            *out = r->getFactionRelation(to);
+            return true;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return false;
+        }
+    }
+    Faction* FactionOf(Character* c)
+    {
+        __try { return c ? c->getFaction() : NULL; }
+        __except (EXCEPTION_EXECUTE_HANDLER) { return NULL; }
+    }
+    bool FactionName(Faction* f, char* out, size_t outSize)
+    {
+        __try
+        {
+            CopyFactionName(f, out, outSize);
+            return true;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            out[0] = 0;
+            return false;
+        }
+    }
 
     Character* Resolve(int slot)
     {
@@ -122,7 +236,7 @@ namespace
 
     // 0 fault/none; the spawn steps in one __try (no C++ objects with destructors in this function).
     Character* SpawnCalls(GameWorld* gw, const kp::RemoteConfig& cfg, const float* pos, char* why, size_t whySize,
-                          Faction** factionOut)
+                          Faction** factionOut, Platoon** squadOut)
     {
         __try
         {
@@ -133,6 +247,7 @@ namespace
             if (!f) { _snprintf_s(why, whySize, _TRUNCATE, "no faction with string id \"%s\"", cfg.faction); return NULL; }
             *factionOut = f;
             Platoon* squad = NewSquad(f, cfg.squadPermanent != 0, pos);
+            *squadOut = squad;
             ActivePlatoon* ap = squad ? squad->getActivePlatoon() : NULL;
             if (!ap) { _snprintf_s(why, whySize, _TRUNCATE, "the faction gave no squad"); return NULL; }
             RootObject* ro = NewBody(fac, f, pos, ap);
@@ -247,12 +362,12 @@ namespace
         }
     }
 
-    // 1: a "[KP] " body that is not a player character; 0 no; -1 fault.
-    int IsStray(Character* c, char* name, size_t nameSize)
+    // 1: a "[KP] " body in our faction that is not a player character; 0 no; -1 fault.
+    int IsStray(Character* c, Faction* ours, char* name, size_t nameSize)
     {
         __try
         {
-            if (!c || c->isPlayerCharacter()) return 0;
+            if (!c || !ours || c->isPlayerCharacter() || c->getFaction() != ours) return 0;
             CopyName(c, name, nameSize);
             return strncmp(name, kNamePrefix, sizeof(kNamePrefix) - 1) == 0 ? 1 : 0;
         }
@@ -269,36 +384,76 @@ namespace
         return false;
     }
 
-    // The save guard: SaveManager::saveGame is the one place that writes a save (its only caller is
-    // SaveManager::execute 0x47c11b; save() and the autosave only ask for one, 1.0.65 0x47b0fe / 0x47b95f, M).
-    typedef int (*SaveGameFn)(SaveManager*, const std::string&, const std::string&);
-    SaveGameFn g_saveOrig = NULL;
-    int SaveGameDetour(SaveManager* self, const std::string& location, const std::string& name)
+    Faction* OurFaction()
     {
-        if (g_saveGuard)
+        GameWorld* gw = kp::GameWorldGlobal();
+        __try
         {
-            int n = 0, still = 0;
-            for (int i = 0; i < KP_SKIP_REMOTE; ++i)
-            {
-                Slot& s = g_slots[i];
-                if (!s.used || s.destroyed) continue;
-                Character* c = Resolve(i);
-                if (!c || !Identity(c, s)) continue;
-                kp::AiSkipSet(1 + i, NULL);
-                bool ret = false;
-                if (DestroyCalls(c, "KenshiPure: a save starts", &ret) == 1) { s.destroyed = true; ++n; }
-            }
-            if (n > 0)
-            {
-                // No forced GameWorld::processKillList(true) here: freeing the body at once crashed the game 0.5 s
-                // later in Character::stumbleState (run 6, M); destroy's own (possibly deferred) path is left alone.
-                for (int i = 0; i < KP_SKIP_REMOTE; ++i)
-                    if (g_slots[i].used && g_slots[i].destroyed && Resolve(i)) ++still;
-                ++g_savesGuarded;
-                kp::Log("remote: a save starts - destroyed %d bod%s first (%d still resolve)", n, n == 1 ? "y" : "ies", still);
-            }
+            FactionManager* fm = gw ? KP_FIELD(gw, GameWorld, factionMgr) : NULL;
+            return fm ? FactionById(fm, g_faction) : NULL;
         }
-        return g_saveOrig(self, location, name);
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return NULL;
+        }
+    }
+
+    // How the factions around a new body stand towards ours (and ours towards them): whether local NPCs would attack it.
+    void LogRelations(Faction* ours)
+    {
+        GameWorld* gw = kp::GameWorldGlobal();
+        static Character* all[2048];
+        unsigned int n = gw && ours ? CopyUpdateList(gw, all, 2048) : 0;
+        Faction* seen[24];
+        int counts[24];
+        int ns = 0;
+        for (unsigned int i = 0; i < n; ++i)
+        {
+            Faction* f = FactionOf(all[i]);
+            if (!f || f == ours) continue;
+            int k = 0;
+            while (k < ns && seen[k] != f) ++k;
+            if (k < ns) { ++counts[k]; continue; }
+            if (ns == 24) continue;
+            seen[ns] = f;
+            counts[ns++] = 1;
+        }
+        for (int k = 0; k < ns; ++k)
+        {
+            char name[64];
+            float theirs = 0.0f, back = 0.0f;
+            bool okT = RelationOf(seen[k], ours, &theirs), okB = RelationOf(ours, seen[k], &back);
+            FactionName(seen[k], name, sizeof(name));
+            if (okT && okB)
+                kp::Log("remote: relation of \"%s\" (%d nearby) towards our faction %.0f%s, ours towards it %.0f%s", name,
+                        counts[k], theirs, theirs <= -30.0f ? " ENEMY" : "", back, back <= -30.0f ? " ENEMY" : "");
+            else
+                kp::Log("remote: relation of \"%s\" (%d nearby) unreadable", name, counts[k]);
+        }
+    }
+
+    // Saves skip our squads: Faction::saveState calls Platoon::serialiseEverything for each of its squads and ignores
+    // the result (1.0.65 0x372d05 / 0x372d54, M); serialiseEverything is the one writer of a squad, its characters and its
+    // platoon file (ActivePlatoon::serialiseEverythingToDisk -> saveToDisk "platoon/<id>.platoon", its only callers,
+    // 0x373839 / 0x4feb3c, M) and returns NULL itself for squads it does not save (dead ones far from the player,
+    // 0x372dfb..0x372ef9, M). So for ours we take that same path; the body stays in the world.
+    typedef GameData* (*SerialiseFn)(Platoon*, GameDataContainer*, bool);
+    SerialiseFn g_serialiseOrig = NULL;
+    GameData* SerialiseDetour(Platoon* self, GameDataContainer* container, bool levelEditor)
+    {
+        if (g_saveSkip && self)
+            for (int i = 0; i < kSquads; ++i)
+            {
+                if (g_squads[i].platoon != self) continue;
+                char id[64];
+                if (PlatoonId(self, id, sizeof(id)) && strcmp(id, g_squads[i].id) == 0)
+                {
+                    ++g_squadsSkipped;
+                    kp::Log("remote: the save skips our squad %s", id);
+                    return NULL;
+                }
+            }
+        return g_serialiseOrig(self, container, levelEditor);
     }
 }
 
@@ -326,7 +481,10 @@ namespace kp
             KPS_AbstractMovementBase__setDesiredSpeed, KPS_AbstractMovementBase__setDesiredSpeedOrders,
             KPS_CharMovement__setDirectMovement, KPS_CharMovement__setPositionDirectionAndTeleport,
             KPS_CharMovement__setPositionSimple, KPS_Character__teleportVisuallyOnly, KPS_CharMovement__halt,
-            KPS_AI__periodicUpdate, KPS_GameWorld__getCharacterUpdateList,
+            KPS_AI__periodicUpdate, KPS_GameWorld__getCharacterUpdateList, KPS_Platoon__getPlatoonStringID,
+            KPS_Platoon__isPersistentSquad, KPS_GameWorld__zoneMgr, KPS_ZoneManager__getZoneMap_Vector3_,
+            KPS_ZoneMap__isLoadedMT, KPS_ZoneMap__isBeingLoadedMT, KPS_ZoneMap__getBoundsMinusUnloadedEdges,
+            KPS_Faction__relations, KPS_FactionRelations__getFactionRelation,
         };
         for (size_t i = 0; i < sizeof(need) / sizeof(need[0]); ++i)
             if (!SiteOk(need[i]))
@@ -340,21 +498,23 @@ namespace kp
             return false;
         }
         memset(g_slots, 0, sizeof(g_slots));
-        g_saveGuard = false;
+        memset(g_squads, 0, sizeof(g_squads));
+        strcpy_s(g_faction, sizeof(g_faction), cfg.faction);
+        g_saveSkip = false;
         if (cfg.saveGuard)
         {
-            if (SiteOk(KPS_SaveManager__saveGame) &&
-                HookSite(KPS_SaveManager__saveGame, (void*)&SaveGameDetour, reinterpret_cast<void**>(&g_saveOrig)))
-                g_saveGuard = true;
+            if (SiteOk(KPS_Platoon__serialiseEverything) &&
+                HookSite(KPS_Platoon__serialiseEverything, (void*)&SerialiseDetour, reinterpret_cast<void**>(&g_serialiseOrig)))
+                g_saveSkip = true;
             else
             {
-                Log("remote: off (the save guard could not be installed; remote_save_guard=0 runs without it)");
+                Log("remote: off (the save skip could not be installed; remote_save_guard=0 runs without it)");
                 return false;
             }
         }
-        Log("remote: on (drive %s, faction %s, max speed %.0f, range %.0f, settle %u s, squads %s, save guard %s)",
+        Log("remote: on (drive %s, faction %s, max speed %.0f, range %.0f, settle %u s, squads %s, saves skip our squads: %s)",
             DriveModeName(cfg.drive), cfg.faction, cfg.maxSpeed, cfg.range, cfg.settleMs / 1000,
-            cfg.squadPermanent ? "permanent" : "temporary", g_saveGuard ? "on" : "OFF");
+            cfg.squadPermanent ? "permanent" : "temporary", g_saveSkip ? "yes" : "NO");
         return true;
     }
 
@@ -362,19 +522,26 @@ namespace kp
     {
         GameWorld* gw = GameWorldGlobal();
         static Character* all[2048];
-        unsigned int n = gw ? CopyUpdateList(gw, all, 2048) : 0;
+        Faction* ours = OurFaction();
+        unsigned int n = gw && ours ? CopyUpdateList(gw, all, 2048) : 0;
         int found = 0;
         for (unsigned int i = 0; i < n; ++i)
         {
             char name[64] = "";
-            if (IsStray(all[i], name, sizeof(name)) != 1 || OwnBody(all[i])) continue;
+            if (IsStray(all[i], ours, name, sizeof(name)) != 1 || OwnBody(all[i])) continue;
             ++found;
             bool ret = false;
             int r = DestroyCalls(all[i], "KenshiPure: stray remote body", &ret);
-            Log("remote: STRAY body \"%s\" in the world (not one of ours: a save kept it?) - destroy %s", name,
-                r == 1 ? "asked" : "faulted");
+            Log("remote: STRAY body \"%s\" in the world (not one of ours: a save from an older build kept it?) - destroy %s",
+                name, r == 1 ? "asked" : "faulted");
         }
         return found;
+    }
+
+    int RemoteGameLoadedAt(const float* pos)
+    {
+        GameWorld* gw = GameWorldGlobal();
+        return gw && pos ? LoadedCalls(gw, pos) : -1;
     }
 
     bool RemoteGameSpawn(const RemoteConfig& cfg, const char* playerName, const float* pos, float yaw, RemoteSpawnInfo* out)
@@ -385,13 +552,27 @@ namespace kp
         if (slot < 0) { Log("remote: no free body slot"); return false; }
         GameWorld* gw = GameWorldGlobal();
         if (!gw) return false;
-        RemoteGameSweep();   // a body a save kept (G7) carries our prefix: remove it before building a new one
+        RemoteGameSweep();   // a body an older build's save kept (G7) carries our prefix: remove it before building a new one
         Slot& s = g_slots[slot];
         memset(&s, 0, sizeof(s));
         _snprintf_s(s.name, sizeof(s.name), _TRUNCATE, "%s%s", kNamePrefix, playerName && playerName[0] ? playerName : "?");
         char why[128] = "";
         Faction* asked = NULL;
-        Character* c = SpawnCalls(gw, cfg, pos, why, sizeof(why), &asked);
+        Platoon* squad = NULL;
+        Character* c = SpawnCalls(gw, cfg, pos, why, sizeof(why), &asked, &squad);
+        // Remember the squad before anything else: from now on no save may write it, with or without its body.
+        char squadId[64] = "";
+        bool remembered = RememberSquad(squad, squadId, sizeof(squadId));
+        if (squad && !remembered)
+        {
+            if (c)
+            {
+                bool ret = false;
+                DestroyCalls(c, "KenshiPure: squad without an id", &ret);
+            }
+            Log("remote: spawn failed: the new squad has no string id, so a save could not skip it (body destroyed)");
+            return false;
+        }
         if (!c)
         {
             Log("remote: spawn failed: %s", why);
@@ -411,7 +592,10 @@ namespace kp
         out->slot = slot;
         strcpy_s(out->faction, sizeof(out->faction), s.faction[0] ? s.faction : "(none)");
         out->factionAsAsked = asAsked;
-        Log("remote: body \"%s\" built in slot %d", s.name, slot);
+        int persistent = PersistentOf(squad);
+        Log("remote: body \"%s\" built in slot %d, squad %s (%s)", s.name, slot, squadId,
+            persistent == 1 ? "permanent" : persistent == 0 ? "temporary" : "persistence unreadable");
+        LogRelations(asked);
         return true;
     }
 

@@ -21,9 +21,11 @@ namespace kp
         float maxSpeed;      // the body's max speed, kept every frame; cfg remote_maxspeed (default 150, 0 = its own)
         float range;         // spawn only this close (x/z) to the local character; cfg remote_range (default 3000)
         unsigned int settleMs;   // no spawn sooner than this after a world change; cfg remote_settle (s, default 3)
-        int squadPermanent;  // Faction::createNewEmptyActivePlatoon's permanent flag; cfg remote_squad_permanent (default 1)
+        int squadPermanent;  // Faction::createNewEmptyActivePlatoon's permanent flag; cfg remote_squad_permanent (default 0:
+                             // the game destroys an empty or unloaded temporary squad, a permanent one stays as an
+                             // unloaded squad, 1.0.65 Faction::updateActivePlatoons 0x6ba884..0x6ba916, M)
         float snapDist;      // snap when the body is this far off; cfg remote_snap (default 300)
-        int saveGuard;       // remove the bodies right before the game writes a save; cfg remote_save_guard (default 1)
+        int saveGuard;       // saves skip our squads (Platoon::serialiseEverything detour); cfg remote_save_guard (default 1)
     };
 
     // Reads the remote* keys of a KenshiPure.cfg text; unknown or bad values keep the defaults.
@@ -62,7 +64,9 @@ namespace kp
             kMaxDestroyTries = 3,    // destroy again after each kRemoveWaitMs while the hand still resolves
             kDownMaxMs = 10000,      // knocked out this long: replace it
             kStatusMs = 1000,
-            kRangeSlack = 500        // remove when farther than range + this
+            kRangeSlack = 500,       // remove when farther than range + this
+            kOutsideMs = 1000        // the body stands outside the loaded zones this long: remove (the game would unload
+                                     // its squad after 4.5 s, ActivePlatoon::unloadCheck 1.0.65 0x4fe28d, M)
         };
         enum State { RB_FREE = 0, RB_WAIT, RB_LIVE, RB_REMOVING, RB_GIVEUP };
 
@@ -85,6 +89,8 @@ namespace kp
             bool verify;                 // the world may have changed: check the hand once the world is back
             int destroyTries;
             unsigned long long downSince;
+            unsigned long long outSince; // since when the body stands outside the loaded zones (0 = inside)
+            bool waitLogged;             // "waiting for a loaded zone" was logged for this wait
             BodyState body;
             DriveCmd lastCmd;
             float lastGap, lastLag;

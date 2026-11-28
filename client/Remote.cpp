@@ -34,7 +34,7 @@ namespace kp
         cfg->maxSpeed = 150.0f;
         cfg->range = 3000.0f;
         cfg->settleMs = 3000;
-        cfg->squadPermanent = 1;
+        cfg->squadPermanent = 0;
         cfg->snapDist = 300.0f;
         cfg->saveGuard = 1;
         const char* p = text ? text : "";
@@ -138,6 +138,8 @@ namespace kp
         b->verify = false;
         b->destroyTries = 0;
         b->downSince = 0;
+        b->outSince = 0;
+        b->waitLogged = false;
         memset(&b->body, 0, sizeof(b->body));
         memset(&b->lastCmd, 0, sizeof(b->lastCmd));
         b->lastGap = b->lastLag = 0.0f;
@@ -400,6 +402,8 @@ namespace kp
         b->verify = false;
         b->downSince = 0;
         b->destroyTries = 0;
+        b->outSince = 0;
+        b->waitLogged = false;
         b->stateAt = nowMs;
         b->applyFails = 0;
         b->lastStatus = 0;
@@ -446,6 +450,19 @@ namespace kp
         }
         b->body = st;
         if (st.down == 2) { Remove(b, nowMs, "it died"); b->nextTry = nowMs + kRetryMs; return; }
+        // Outside the loaded zones the game unloads the squad after 4.5 s (a temporary one is destroyed with its body,
+        // a permanent one stays as an unloaded squad): remove it ourselves first, respawn once the pose is back inside.
+        if (game_->RemoteLoadedAt(st.pos) == 0)
+        {
+            if (b->outSince == 0) b->outSince = nowMs;
+            else if (nowMs - b->outSince >= (unsigned long long)kOutsideMs)
+            {
+                Remove(b, nowMs, "it left the loaded zones");
+                b->nextTry = nowMs + kRetryMs;
+                return;
+            }
+        }
+        else b->outSince = 0;
         if (st.down == 1)
         {
             if (b->downSince == 0) b->downSince = nowMs;
@@ -583,6 +600,18 @@ namespace kp
                 if (b->left) { Free(b); break; }
                 if (!settled || spawnedThisFrame || live >= kMaxBodies || !poseFresh || nowMs < b->nextTry) break;
                 if (dist > cfg_.range) break;
+                if (game_->RemoteLoadedAt(newest.pos) == 0)
+                {
+                    // Not simulated there: a body would stand still and be unloaded within seconds.
+                    if (!b->waitLogged)
+                    {
+                        b->waitLogged = true;
+                        Logf("remote: %s (%u) is outside the loaded zones (%.0f %.0f) - waiting", b->name, b->id,
+                             newest.pos[0], newest.pos[2]);
+                    }
+                    break;
+                }
+                b->waitLogged = false;
                 spawnedThisFrame = true;   // one spawn per frame (each is a heavy game call)
                 if (TrySpawn(b, nowMs)) ++live;
                 break;

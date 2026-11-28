@@ -66,6 +66,9 @@ namespace kp
         virtual bool RemoteVerify(int /*slot*/) { return false; }
         virtual void RemoteFree(int /*slot*/) {}
         virtual void RemoteForgetAll() {}
+        // 1: pos lies in a loaded zone (the test ActivePlatoon::unloadCheck makes), 0: not (a squad there unloads),
+        // -1: unknown (treated as loaded).
+        virtual int RemoteLoadedAt(const float* /*pos*/) { return -1; }
         // Once per world after it settled: destroy bodies named like ours that are not ours (a save kept them, G7).
         virtual void RemoteSweep() {}
     };

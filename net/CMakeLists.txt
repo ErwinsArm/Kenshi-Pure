@@ -39,7 +39,7 @@ add_executable(kp-bot bot/main.cpp)
 target_link_libraries(kp-bot PRIVATE kp_net)
 # The client core: modern C++ behind the plain C interface client/KpCore.h; static CRT, so the
 # plugin (VC++ 2010, Kenshi's MSVCR100) and the core share no runtime.
-set(KP_CORE_BUILD "0.0.6-m5")   # not a cache entry: a cached one kept old versions (M4)
+set(KP_CORE_BUILD "0.0.7-m5")   # not a cache entry: a cached one kept old versions (M4)
 add_library(KenshiPureCore SHARED core/Core.cpp)
 target_include_directories(KenshiPureCore PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../client)
 target_compile_definitions(KenshiPureCore PRIVATE KP_CORE_BUILD="${KP_CORE_BUILD}")

@@ -54,6 +54,7 @@ namespace
         void RemoteFree(int slot) { kp::RemoteGameFree(slot); }
         void RemoteForgetAll() { kp::RemoteGameForgetAll(); }
         void RemoteSweep() { kp::RemoteGameSweep(); }
+        int RemoteLoadedAt(const float* pos) { return kp::RemoteGameLoadedAt(pos); }
     };
 
     GameAccess g_game;
