@@ -83,7 +83,7 @@ namespace kp
 
     NetFrame::NetFrame()
         : api_(0), core_(0), game_(0), lastTick_(0), haveEpoch_(false),
-          epoch_(0), epochStart_(0), firstOfEpochDropped_(false), settled_(false),
+          epoch_(0), epochStart_(0), firstOfEpochDropped_(false), settled_(false), epochDropped_(0), firstDestZero_(false),
           localOk_(false), localEpoch_(0), localPaused_(false), trackId_(0), siOn_(false), siEpoch_(0),
           seenEpoch_(0), epochSince_(0), nextPick_(0), lastStatus_(0), lastNoPickLog_(0), phaseStart_(0), phase_(0), phaseAiSkip_(false), waking_(false),
           applyFails_(0), lastGap_(0.0f)
@@ -196,6 +196,8 @@ namespace kp
             epochStart_ = nowMs;
             firstOfEpochDropped_ = true;
             settled_ = false;
+            epochDropped_ = 1;
+            firstDestZero_ = s.dest[0] == 0.0f && s.dest[1] == 0.0f && s.dest[2] == 0.0f;
             ++stats_.posesUnsettled;           // the first sample of an epoch never goes out
             return;
         }
@@ -205,11 +207,14 @@ namespace kp
             if (!destSet && nowMs - epochStart_ < (unsigned long long)kSettleMaxMs)
             {
                 ++stats_.posesUnsettled;
+                ++epochDropped_;
                 return;
             }
             settled_ = true;
-            Logf("net: sending own pose (%u sample%s after the load dropped%s)", stats_.posesUnsettled,
-                 stats_.posesUnsettled == 1 ? "" : "s", destSet ? "" : ", destination still 0/0/0 after 2 s");
+            // Evidence for the rule (docs/client.md "Own pose (M1)"): was the dropped first sample half set up?
+            Logf("net: sending own pose (%u sample%s of this world dropped; the first had destination %s; %u more had 0/0/0%s)",
+                 epochDropped_, epochDropped_ == 1 ? "" : "s", firstDestZero_ ? "0/0/0 (half set up)" : "set",
+                 epochDropped_ - 1, destSet ? "" : ", still 0/0/0 after 2 s: sent anyway");
         }
         if (!Finite(s.pos, 3) || !Finite(s.vel, 3) || !Finite(&s.yawDeg, 1))
         {

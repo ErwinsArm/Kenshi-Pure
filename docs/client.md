@@ -79,6 +79,18 @@ may already have hooked a function in memory, and the file's SHA-256 names the b
 - Writes: `sites.mjs gen` refuses a row of a `-write` feature that is not proven in every build.
 - Hooks: `client/Hooks.cpp`, one MinHook detour per function, listeners behind it (`OnFrame`).
 
+## Start time without RE_Kenshi
+
+An earlier run without RE_Kenshi needed ~100 s to the first frame (~20 s with it), put down to RE_Kenshi's shader
+cache (`RE_Kenshi\shader_cache.sc`, 248 shaders). Kenshi's Ogre has its own microcode cache
+(`GpuProgramManager::setSaveMicrocodesToCache`, `loadMicrocodeCache`, `saveMicrocodeCache`; the D3D11 render system
+imports them) that Kenshi never switches on (no reference in either exe, **M**). The loader counts the render
+system's `D3DCompile` calls (it imports them from the game's `D3DCompiler_43.dll`) and logs count and time when the
+render loop starts and ends. Run on Steam 1.0.68 without RE_Kenshi (**M**, `run-game-test.ps1 -NoReKenshi`, save
+"MP TEST" and one reload): first frame 22.7 s after the plugin start, 194 compiles in 8.7 s in all. A cache could save
+at most those ~9 s per start, so none is built; what made the earlier start slow is not known (a cold file cache or
+the driver's own shader cache are guesses, **I**).
+
 # Client: own pose (M1)
 
 Source: `client/Pose.cpp`, pure helpers `client/PoseMath.h` (unit tests `client/test/PoseMathTest.cpp`,
@@ -89,7 +101,11 @@ game kept running. Second PC (**M**, a tester's log, same build 0.0.3-m1): Steam
 facing, 0 standing); no fault.
 - First sample after a load can be half set up (**M**, second PC): destination and path destination
   0/0/0 (so `walking` 1) and a yaw (147.5) that does not match `facing` (0, 0, 1); the next sample, 1 s
-  later, was consistent. M3 should drop poses until destination is non-zero or skip the first sample.
+  later, was consistent. NetFrame drops the first sample of each epoch and then samples with destination 0/0/0
+  (at most 2 s) and logs per world how many it dropped and whether the first was half set up
+  (`net: sending own pose (…; the first had destination set|0/0/0 (half set up); …)`). On this PC the first
+  sample had its destination in all 4 loads checked (two in the M3 run, two in a 1.0.68 run, **M**), so the rule has not met a half-set-up
+  sample in game yet.
 
 - Every 100 ms on the frame thread (after the game's frame): the local character is the player's
   selected character if it is one of `PlayerInterface::playerCharacters`, else the first of them; none
@@ -131,9 +147,9 @@ RE_Kenshi, build 0.0.4-m3, `kp-server --local --log-poses` + `kp-bot` on the sam
 - A save load from the Escape menu (~6 s without own character): no `connection lost`, the same
   player id; after each load 1 and 2 samples were dropped before sending, and the first logged
   samples were already consistent (destination = position, yaw = facing), so the half-set-up
-  sample was not seen in this run. A 60 s load stall was not seen in game (only in the test).
-- Game exit: the server reported `player 2 left (timed out)` ~7 s later (no `dllStopPlugin`, below);
-  RE_Kenshi's known first-chance access violation at exit (`RE_Kenshi.dll+0x381e9`) came again.
+  sample was not seen in this run.
+- Game exit (that build): the server reported `player 2 left (timed out)` ~7 s later; fixed by the exit hook
+  (below).
 
 **Pieces**
 - `KenshiPureCore.dll` (`net/core/Core.cpp`): MSVC 14.44, C++20, static CRT, built by
@@ -171,14 +187,35 @@ missing and keeps lines already there (another server, another name).
 - Each frame it drains events (join and leave logged) and the remote poses (latest per announced
   player, at most 64), each player's pose logged at most once a second:
   `net: remote <name> (<id>) pos … vel … yaw … moving … age … ms`.
-- Exit: the loader's `dllStopPlugin` calls KenshiPure's `kpStop` (leave + stop, at most 2 s; the
-  thread is left to the process exit if it hangs). Kenshi does not seem to call `dllStopPlugin`: no
-  `KenshiPureLoader.log` holds its line, 4 game exits including the M3 run (**M**); so the server
-  reports a closing player as timed out after ENet's 5–30 s (~7 s in the M3 run).
+- Exit: see "Exit" below; `kpStop` = leave + stop, at most 2 s (the thread is left to the process exit if
+  it hangs).
+
+**Exit** (**M**, 1.0.65 exe disassembly, RVAs): Kenshi never destroys Ogre's Root, so Ogre never calls
+`dllStopPlugin` (no loader log line in 4 exits). Every way of quitting sets the quit byte `0x2132408`
+(`TitleScreen::exitGame` `0x9142b0`, a window-close listener `0x812500` (its role **I**), `0x913050`,
+`0x82a460`, `~GameWorld`); the frame callback `0x82aaf0` then returns false, Ogre's `Root::startRendering`
+returns to `Renderer::go` (`0x812890`: `mov rcx,[rcx+68h]; jmp [startRendering]`), then
+`KingOfRenderThread::startup` (`0x86c0c0`, which also creates the Root: our plugin starts inside it) and WinMain
+(`0x744960`) return, WinMain with 1, and the C runtime calls `exit`. The loader (0.0.4-m3) hooks OgreMain's
+`Root::startRendering` export and calls `kpStop` once it returns: no frame runs any more and every thread is
+alive. 1.0.68 has the same `Renderer::go` (`0x813460`). Runs (**M**, step `quit` = WM_CLOSE to the game window;
+two on 1.0.65 with RE_Kenshi, one on Steam 1.0.68 without it): the loop ended 80–140 ms after WM_CLOSE, the server
+logged `player 2 left (left)`, the remote bodies were forgotten without a game call, exit code 1 (WinMain's own), no
+crash dump, and no exception at all at exit (the first-chance access violation in `RE_Kenshi.dll+0x381e9` that
+the user's exits in the M0 and M3 runs showed did not come; that it was RE_Kenshi's own and handled is **I**: it was
+in RE_Kenshi's module and the game went on to exit).
 
 **Load stalls (plan G14)**: the game's frame thread blocks ~60 s while loading; the network thread
 keeps servicing ENet meanwhile, so neither side's ENet timeout (5–30 s, protocol-ours.md "Timeouts")
-is reached. Shown without the game (**M**, `kp-core-test`), not yet in game.
+is reached. **M**: `kp-core-test`, and in game the test step `stall 60` (the game's main thread sleeps 60 s,
+no frame runs) in two runs: no `connection lost`, the server timed nobody out.
+
+**Timer resolution**: ENet's `enet_initialize` calls `timeBeginPeriod(1)` (`win32.c`); no Kenshi module
+names `timeBeginPeriod` (both exes and every DLL in the game folder, string search). `client/Perf.cpp` logs every
+10 s `perf: fps …, cpu …% of one core, Sleep(1) … ms, system timer … ms` (Sleep(1) measured in the process: what
+the game's own waits get). A/B runs (**M**, same save and steps): with ENet's request undone (`timeEndPeriod(1)`
+returned ok) Sleep(1) still took 1–2 ms, so something else in the process holds a fine timer; fps 51–57 and cpu
+136–160 % in both. ENet's request costs nothing measurable and stays (the network thread's 2 ms polling needs it).
 
 **Test** `net/test/CoreTest.cpp` (`kp-core-test`, CTest, ~62 s; **M**, passes on this PC, 52 checks):
 the core DLL loaded by `LoadLibrary` through its C table, `NetFrame` with a fake game, the real
@@ -354,7 +391,11 @@ new body 3 s later; no fault in any run except run 6. Log: per body a status lin
 
 **Test runs** (`scripts/run-game-test.ps1`, added for M5): `-Cfg "k=v;…"` (KenshiPure.cfg keys for one run, restored
 after; `standin` lines dropped), `-Steps "at=<s> save|load SAVE NAME;…"` (run by `client/AutoLoad.cpp` from the game
-window's messages, seconds after the world was entered), `-BotSeconds`, `-BotRestart`, `-SaveCopy`.
+window's messages, seconds after the world was entered; also `stall <s>` (the main thread sleeps), `select <n>`
+(`PlayerInterface::selectPlayerCharacter(n, false, false)`, as `GameWorld::processKeys` calls it for a number key,
+1.0.65 `0x787745`) and `quit` (WM_CLOSE to the game window; the script then waits for Kenshi to exit by itself and
+prints its exit code, the loader's stop line, the server's leave line and any new crash dump)), `-BotSeconds`,
+`-BotRestart`, `-SaveCopy`, `-NoReKenshi` (the `Plugin=RE_Kenshi` line is left out for one run: Steam's 1.0.68 exe).
 
 Open: relations measured at one spot only (a faction elsewhere could stand at -30 or below; nothing makes ours neutral
 yet); two real players (M6); the bot's circle, not a real player, made the measurements.

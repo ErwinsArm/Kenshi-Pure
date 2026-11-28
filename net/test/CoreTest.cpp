@@ -346,8 +346,8 @@ int main() {
     // 3. The server goes away and comes back on the same port: lost, then a new id.
     obs.shutdown();
     server.shutdown();
-    CHECK(frames(nf, 3000, [&] { return status(real, nf, core).state != KP_CORE_WELCOMED; }));
-    CHECK(g_lines.has("connection lost"));
+    // The core sets its state before it logs the loss (network thread): wait for both, not only the state.
+    CHECK(frames(nf, 3000, [&] { return status(real, nf, core).state != KP_CORE_WELCOMED && g_lines.has("connection lost"); }));
     ServerThread server2;
     CHECK(server2.start(port));
     CHECK(frames(nf, 15000, [&] { return status(real, nf, core).state == KP_CORE_WELCOMED; }));
@@ -361,8 +361,12 @@ int main() {
     auto stopMs = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t0).count();
     std::printf("stop took %lld ms\n", static_cast<long long>(stopMs));
     CHECK(stopMs < 1500);
-    std::this_thread::sleep_for(300ms);
-    CHECK(g_lines.has("left (left)"));
+    // The server logs the leave on its own thread: wait up to 3 s for our own player's line (the
+    // observer's earlier leave also says "left (left)").
+    char leftLine[64];
+    std::snprintf(leftLine, sizeof(leftLine), "server: player %u left (left)", static_cast<unsigned>(st.playerId));
+    for (int i = 0; i < 300 && !g_lines.has(leftLine); ++i) std::this_thread::sleep_for(10ms);
+    CHECK(g_lines.has(leftLine));
     server2.shutdown();
     return TEST_RESULT("kp-core-test");
 }

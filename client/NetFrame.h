@@ -150,6 +150,8 @@ namespace kp
         unsigned long long epochStart_;
         bool firstOfEpochDropped_;
         bool settled_;
+        unsigned epochDropped_;    // samples of this epoch not sent (first + destination 0/0/0)
+        bool firstDestZero_;       // the first sample of this epoch had destination 0/0/0 (half set up)
         Player players_[kMaxPlayers];
 
         // Latest local sample (for the stand-in), set each frame by SendLocal.

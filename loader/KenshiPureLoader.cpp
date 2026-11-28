@@ -2,7 +2,7 @@
 // Plugins_x64.cfg holds `Plugin=mods/KenshiPure/KenshiPureLoader` (after `Plugin=RE_Kenshi` when that
 // is there, else before the first Plugin= line), so Ogre loads us while the Root is being built,
 // before the render system and the game window exist (scripts/install-client.ps1 adds the line).
-// Order: log pid/exe/hash -> AnarchyKenshi check -> display fix armed -> KenshiPure.dll kpStart().
+// Order: log pid/exe/hash -> AnarchyKenshi check -> display fix armed -> exit hook -> KenshiPure.dll kpStart().
 // Built with the VC++ 2010 (v100) toolset, /MD (Kenshi's CRT); keep to C++ that compiler accepts.
 
 #include <windows.h>
@@ -17,7 +17,7 @@
 #include "Display.h"
 #include "DxgiFix.h"
 
-#define KPL_VERSION "0.0.3-m3"
+#define KPL_VERSION "0.0.4-m3"
 
 namespace
 {
@@ -26,6 +26,89 @@ namespace
     char g_build[160] = "";
     KpHost g_host;
     HMODULE g_kpDll = NULL;   // KenshiPure.dll, pinned once started
+
+    // KenshiPure's kpStop, once: from the end of the game's render loop or from dllStopPlugin.
+    void StopKenshiPure(const char* why)
+    {
+        static volatile LONG stopped = 0;
+        if (InterlockedExchange(&stopped, 1) != 0) return;
+        kp::Log("loader: %s - stopping KenshiPure", why);
+        // KenshiPure.dll is pinned (never unloaded), so its kpStop is still there; older builds have none.
+        if (!g_kpDll) return;
+        typedef void (*KpStopFn)();
+        KpStopFn stop = (KpStopFn)GetProcAddress(g_kpDll, "kpStop");
+        if (stop) stop();
+    }
+
+    // Exit hook. Kenshi never destroys Ogre's Root, so Ogre never calls dllStopPlugin (docs/client.md
+    // "Exit"). Quitting (title screen Exit, the window's close button) sets the game's quit flag; the
+    // frame callback then returns false, Ogre::Root::startRendering returns to Renderer::go and
+    // KingOfRenderThread::startup, WinMain returns and the C runtime calls exit(). startRendering is
+    // the game's render loop, called once (after the Root and our plugin exist), on the thread that runs
+    // every frame: when it returns no frame runs any more and every thread is still alive, so the
+    // network thread can still send the leave.
+    typedef void (*StartRenderingFn)(void* root);
+    StartRenderingFn g_startRenderingOrig = NULL;
+
+    // Shader compile count and time (docs/client.md "Start time without RE_Kenshi"): Ogre's D3D11 render
+    // system imports D3DCompile from the game's D3DCompiler_43.dll; Kenshi never switches Ogre's microcode
+    // cache on, so every start compiles every shader again (RE_Kenshi keeps its own cache). Counting only.
+    typedef HRESULT (WINAPI* D3DCompileFn)(LPCVOID, SIZE_T, LPCSTR, const void*, void*, LPCSTR, LPCSTR, UINT, UINT, void**, void**);
+    D3DCompileFn g_d3dCompileOrig = NULL;
+    volatile LONG g_compiles = 0;
+    volatile LONGLONG g_compileTicks = 0;
+    LARGE_INTEGER g_qpf;
+
+    HRESULT WINAPI D3DCompileDetour(LPCVOID src, SIZE_T size, LPCSTR name, const void* defines, void* include, LPCSTR entry,
+                                    LPCSTR target, UINT flags1, UINT flags2, void** code, void** errors)
+    {
+        LARGE_INTEGER a, b;
+        QueryPerformanceCounter(&a);
+        HRESULT r = g_d3dCompileOrig(src, size, name, defines, include, entry, target, flags1, flags2, code, errors);
+        QueryPerformanceCounter(&b);
+        InterlockedIncrement(&g_compiles);
+        InterlockedExchangeAdd64(&g_compileTicks, b.QuadPart - a.QuadPart);
+        return r;
+    }
+
+    void LogCompiles(const char* when)
+    {
+        if (!g_d3dCompileOrig) return;
+        kp::Log("loader: shaders compiled %s: %ld, %.1f s in D3DCompile", when, g_compiles,
+                g_qpf.QuadPart ? (double)g_compileTicks / g_qpf.QuadPart : 0.0);
+    }
+
+    void ArmCompileCounter()
+    {
+        QueryPerformanceFrequency(&g_qpf);
+        // The game's own copy (the exe's folder comes first in the search order); the render system,
+        // loaded after us, binds to this same module.
+        HMODULE c = LoadLibraryW(L"D3DCompiler_43.dll");
+        void* target = c ? (void*)GetProcAddress(c, "D3DCompile") : NULL;
+        if (!target) { kp::Log("loader: no D3DCompiler_43.dll D3DCompile - shader compiles not counted"); return; }
+        MH_STATUS s = MH_CreateHook(target, (void*)&D3DCompileDetour, reinterpret_cast<void**>(&g_d3dCompileOrig));
+        if (s == MH_OK) s = MH_EnableHook(target);
+        if (s != MH_OK) g_d3dCompileOrig = NULL;
+        kp::Log("loader: D3DCompile at %p %s", target, s == MH_OK ? "hooked (counting shader compiles)" : MH_StatusToString(s));
+    }
+
+    void StartRenderingDetour(void* root)
+    {
+        LogCompiles("before the render loop");
+        g_startRenderingOrig(root);
+        LogCompiles("by the end of the render loop");
+        StopKenshiPure("the game's render loop ended (the game is closing)");
+    }
+
+    void ArmExitHook()
+    {
+        HMODULE ogre = GetModuleHandleW(L"OgreMain_x64.dll");
+        void* target = ogre ? (void*)GetProcAddress(ogre, "?startRendering@Root@Ogre@@QEAAXXZ") : NULL;
+        if (!target) { kp::Log("loader: OgreMain_x64.dll has no Root::startRendering export - no exit hook"); return; }
+        MH_STATUS s = MH_CreateHook(target, (void*)&StartRenderingDetour, reinterpret_cast<void**>(&g_startRenderingOrig));
+        if (s == MH_OK) s = MH_EnableHook(target);
+        kp::Log("loader: Ogre::Root::startRendering at %p %s", target, s == MH_OK ? "hooked (exit hook)" : MH_StatusToString(s));
+    }
 
     bool Sha256File(const wchar_t* path, char out[65], unsigned long long* size)
     {
@@ -138,6 +221,8 @@ namespace
         else if (!full) kp::Log("dxgi: kenshi.cfg says windowed - display fix off");
         else if (kp::DisplayFixOff()) kp::Log("dxgi: display_fix=0 in KenshiPure.cfg - display fix off");
         else if (mh == MH_OK && kp::DxgiFixArm()) displayHook = 1;
+        if (mh == MH_OK) ArmExitHook();
+        if (mh == MH_OK) ArmCompileCounter();
 
         wchar_t dll[MAX_PATH];
         _snwprintf_s(dll, MAX_PATH, _TRUNCATE, L"%sKenshiPure.dll", kp::PluginDir());
@@ -171,12 +256,5 @@ extern "C" __declspec(dllexport) void dllStartPlugin()
 
 extern "C" __declspec(dllexport) void dllStopPlugin()
 {
-    kp::Log("loader: Ogre unloads its plugins (game is closing)");
-    // KenshiPure.dll is pinned (never unloaded), so its kpStop is still there; older builds have none.
-    if (g_kpDll)
-    {
-        typedef void (*KpStopFn)();
-        KpStopFn stop = (KpStopFn)GetProcAddress(g_kpDll, "kpStop");
-        if (stop) stop();
-    }
+    StopKenshiPure("Ogre unloads its plugins (game is closing)");
 }

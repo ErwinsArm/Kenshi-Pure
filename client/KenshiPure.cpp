@@ -20,13 +20,14 @@
 #include "Net.h"
 #include "AutoLoad.h"
 #include "Cheat.h"
+#include "Perf.h"
 
-#define KP_VERSION "0.0.7-m5"
+#define KP_VERSION "0.0.8-m5"
 
 namespace
 {
     // Frame and once-per-second state; touched only on the frame thread.
-    unsigned long long g_frames = 0;
+    volatile unsigned long long g_frames = 0;   // read by the perf thread
     unsigned long long g_framesAtLastLine = 0;
     ULONGLONG g_lastLine = 0;
     bool g_threadLogged = false;
@@ -236,6 +237,7 @@ extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
     kp::Log("frame: hook installed; waiting for the first frame");
     kp::PoseInit();
     kp::NetStart();
+    kp::PerfStart(&g_frames);   // after NetStart: the first line shows the timer with ENet's request
     kp::AutoLoadInit();
     kp::CheatInit(host);
     if (kp::FeatureOn("optional:probe")) kp::ProbeStart();
@@ -243,8 +245,9 @@ extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
     return 1;
 }
 
-// Called by KenshiPureLoader.dll's dllStopPlugin when Ogre unloads its plugins (game exit): leaves the
-// server so the others see "left" instead of a timeout, and stops the network thread.
+// Called by KenshiPureLoader.dll when the game closes (the end of Ogre's render loop; dllStopPlugin, which
+// Kenshi never reaches): leaves the server so the others see "left" instead of a timeout, and stops the
+// network thread. Runs on the frame thread after the last frame.
 extern "C" __declspec(dllexport) void kpStop()
 {
     kp::NetStop();

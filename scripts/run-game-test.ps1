@@ -7,8 +7,13 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\run-game-test.ps1 -GameDir <Kenshi folder> -Save "<save name>"
 #              [-Seconds 200] [-BotArgs "--around-first --radius 300 --speed 60"] [-Grep "standin:"]
 #              [-Cfg "remote_drive=steer;remote_save_guard=0"] [-Steps "at=90 save SAVE NAME;at=150 load SAVE NAME"]
-#              [-BotSeconds 120] [-BotRestart 150] [-SaveCopy]
+#              [-BotSeconds 120] [-BotRestart 150] [-SaveCopy] [-NoReKenshi]
 #
+# Steps also take "at=<s> stall <seconds>" (the game's main thread sleeps, as in a long load) and
+# "at=<s> quit" (the game window gets WM_CLOSE, as from its close button); after a quit the script waits
+# for Kenshi to exit by itself and prints its exit code, the loader's stop line and the server's leave line.
+# -NoReKenshi leaves the Plugin=RE_Kenshi line out of Plugins_x64.cfg for this run (Steam's own exe runs,
+# without RE_Kenshi); the file comes back afterwards.
 # -Cfg sets KenshiPure.cfg keys for this run (the file comes back afterwards); standin= lines are dropped
 # unless -Cfg sets standin. -Steps are timed steps for the plugin (seconds after the world was entered;
 # "SAVE NAME" is replaced by the save this run loads). -BotSeconds makes the bot leave after that long;
@@ -28,7 +33,8 @@ param(
     [string]$Steps = "",
     [int]$BotSeconds = 0,
     [int]$BotRestart = 0,
-    [switch]$SaveCopy
+    [switch]$SaveCopy,
+    [switch]$NoReKenshi
 )
 $ErrorActionPreference = "Stop"
 $cfgSets = $Cfg   # PowerShell names ignore case: $cfg below is kenshi.cfg and would overwrite -Cfg
@@ -53,6 +59,8 @@ Add-Type -AssemblyName System.Windows.Forms
 $backup = "$cfg.kp-test-backup"
 $kpCfg = Join-Path $mod "KenshiPure.cfg"
 $kpBackup = "$kpCfg.kp-test-backup"
+$plugins = Join-Path $GameDir "Plugins_x64.cfg"
+$pluginsBackup = "$plugins.kp-test-backup"
 $copyName = "KP TEST $Save"
 $copyDir = Join-Path $saveRoot $copyName
 # Deletes the save copy: only a folder directly under save\ whose name starts with "KP TEST ".
@@ -66,16 +74,33 @@ function Remove-SaveCopy {
 # A run that was killed before its cleanup leaves backups, autoload.txt and a save copy: restore them first.
 if (Test-Path $backup) { Move-Item $backup $cfg -Force; Write-Host "restored kenshi.cfg left over by an aborted run" }
 if (Test-Path $kpBackup) { Move-Item $kpBackup $kpCfg -Force; Write-Host "restored KenshiPure.cfg left over by an aborted run" }
+if (Test-Path $pluginsBackup) { Move-Item $pluginsBackup $plugins -Force; Write-Host "restored Plugins_x64.cfg left over by an aborted run" }
 Remove-Item (Join-Path $mod "autoload.txt") -ErrorAction SilentlyContinue
 Remove-SaveCopy
 Get-Process kp-server, kp-bot -ErrorAction SilentlyContinue | Stop-Process -Force -Confirm:$false
-$server = $null; $bot = $null; $bot2 = $null
+$server = $null; $bot = $null; $bot2 = $null; $game = $null; $exitedAt = $null
+# Waits up to $sec seconds; returns early when Kenshi has exited by itself (a quit step).
+function Wait-Run([int]$sec) {
+    $until = (Get-Date).AddSeconds($sec)
+    while ((Get-Date) -lt $until) {
+        if ($script:game -and $script:game.HasExited) { $script:exitedAt = Get-Date; return $false }
+        Start-Sleep -Seconds 1
+    }
+    return $true
+}
 try {
     # Windowed for the test; the user's kenshi.cfg comes back in finally.
     Copy-Item $cfg $backup -Force
     $text = Get-Content $cfg -Raw
     $text = $text -replace "(?m)^Full Screen=.*$", "Full Screen=No" -replace "(?m)^Video Mode=.*$", "Video Mode=1600 x 900 @ 32-bit colour"
     Set-Content -Path $cfg -Value $text -NoNewline -Encoding ascii
+
+    if ($NoReKenshi) {
+        Copy-Item $plugins $pluginsBackup -Force
+        $pl = @(Get-Content $plugins | Where-Object { $_.Trim() -ne "Plugin=RE_Kenshi" })
+        Set-Content -Path $plugins -Value $pl -Encoding ascii
+        Write-Host "Plugins_x64.cfg for this run: without RE_Kenshi"
+    }
 
     # KenshiPure.cfg for this run (back in finally).
     Copy-Item $kpCfg $kpBackup -Force
@@ -124,6 +149,8 @@ try {
     if (-not $framed) { throw "No first frame within $StartTimeout s (a launcher window waiting for a click?)." }
     # The game window exists now (the start dialog was another window): put it on the second monitor.
     $p = Get-Process kenshi_x64 -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+    $game = $p
+    if ($game) { $null = $game.Handle }   # keeps a handle, so the exit code can be read after it exits
     $target = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
     if ($p -and $target) {
         [KpWin]::SetWindowPos($p.MainWindowHandle, [IntPtr]::Zero, $target.Bounds.X + 40, $target.Bounds.Y + 40, 0, 0, 0x0001 -bor 0x0004 -bor 0x0010) | Out-Null
@@ -131,13 +158,16 @@ try {
     }
     Write-Host "First frame; running the test for $Seconds s"
     if ($BotRestart -gt 0 -and $BotRestart -lt $Seconds) {
-        Start-Sleep -Seconds $BotRestart
-        Write-Host "starting the bot again"
-        $bot2 = Start-Process -FilePath (Join-Path $net "Release\kp-bot.exe") -ArgumentList $botArgList `
-            -RedirectStandardOutput (Join-Path $net "kp-bot2.log") -RedirectStandardError (Join-Path $net "kp-bot2.err.log") -WindowStyle Hidden -PassThru
-        Start-Sleep -Seconds ($Seconds - $BotRestart)
+        if (Wait-Run $BotRestart) {
+            Write-Host "starting the bot again"
+            $bot2 = Start-Process -FilePath (Join-Path $net "Release\kp-bot.exe") -ArgumentList $botArgList `
+                -RedirectStandardOutput (Join-Path $net "kp-bot2.log") -RedirectStandardError (Join-Path $net "kp-bot2.err.log") -WindowStyle Hidden -PassThru
+            $null = Wait-Run ($Seconds - $BotRestart)
+        }
     }
-    else { Start-Sleep -Seconds $Seconds }
+    else { $null = Wait-Run $Seconds }
+    if ($exitedAt) { Write-Host ("Kenshi exited by itself {0:N0} s after the first frame, exit code {1}" -f ($exitedAt - $startedAt).TotalSeconds, $game.ExitCode) }
+    elseif ($Steps -match "\bquit\b") { Write-Host "Kenshi did NOT exit after the quit step - it is killed now" }
 }
 finally {
     Get-Process kenshi_x64 -ErrorAction SilentlyContinue | Stop-Process -Force -Confirm:$false   # no save on the way out
@@ -145,8 +175,15 @@ finally {
     Start-Sleep -Seconds 2
     if (Test-Path $backup) { Move-Item $backup $cfg -Force }
     if (Test-Path $kpBackup) { Move-Item $kpBackup $kpCfg -Force }
+    if (Test-Path $pluginsBackup) { Move-Item $pluginsBackup $plugins -Force }
     Remove-Item (Join-Path $mod "autoload.txt") -ErrorAction SilentlyContinue
     Remove-SaveCopy
 }
 Write-Host "--- KenshiPure.log ($Grep)"
 Select-String -Path $log -Pattern $Grep | ForEach-Object { $_.Line }
+if ($Steps -match "\bquit\b") {
+    Write-Host "--- KenshiPureLoader.log (stop) and kp-server.log (leave)"
+    Select-String -Path (Join-Path $mod "KenshiPureLoader.log") -Pattern "stopping KenshiPure|startRendering" | ForEach-Object { $_.Line }
+    Select-String -Path (Join-Path $net "kp-server.log") -Pattern "left \(" | ForEach-Object { $_.Line }
+    Get-ChildItem $GameDir -Filter "crashDump*.dmp" | Where-Object { $_.LastWriteTime -gt $startedAt } | ForEach-Object { Write-Host "CRASH DUMP: $($_.Name)" }
+}

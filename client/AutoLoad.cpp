@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <string>
 
 #include "Game.h"
@@ -14,10 +15,13 @@ namespace
     char g_save[256] = "";
     bool g_pending = false;
 
-    // Later steps of a test run (lines after the first in autoload.txt): "at=<s> load <save>" or
-    // "at=<s> save <save>", seconds after the first world was entered. Run from the game window's
-    // messages (the main thread, outside the frame hook), like the first load.
-    struct Step { unsigned int atMs; int kind; char name[128]; bool done; };   // kind 1 load, 2 save
+    // Later steps of a test run (lines after the first in autoload.txt): "at=<s> load <save>",
+    // "at=<s> save <save>", "at=<s> stall <seconds>" (the main thread sleeps: no frame runs, as in a
+    // long load), "at=<s> select <n>" (selects member n of the squad, as the game's number keys do) or
+    // "at=<s> quit" (WM_CLOSE to the game window, as its close button), seconds after the
+    // first world was entered. Run from the game window's messages (the main thread, outside the frame
+    // hook), like the first load.
+    struct Step { unsigned int atMs; int kind; char name[128]; bool done; };   // kind 1 load, 2 save, 3 stall, 4 quit, 5 select
     Step g_steps[16];
     int g_stepCount = 0;
     unsigned long long g_worldSince = 0;
@@ -29,6 +33,23 @@ namespace
     }
 
     // 1 asked, 0 no save manager yet, -1 faulted.
+    // PlayerInterface::selectPlayerCharacter(index, add, focus) as GameWorld::processKeys calls it for a
+    // number key (1.0.65 0x787745: add = shift held, focus = a quick second press). 1 asked, -1 faulted.
+    int TrySelect(GameWorld* gw, int index)
+    {
+        __try
+        {
+            PlayerInterface* pi = KP_FIELD(gw, GameWorld, player);
+            if (!pi) return 0;
+            pi->selectPlayerCharacter(index, false, false);
+            return 1;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return -1;
+        }
+    }
+
     int TrySave(const char* name)
     {
         __try
@@ -122,6 +143,7 @@ namespace
     // handled on the game's main thread, also at the menu: a posted message runs the load there.
     const UINT kMsgAutoLoad = WM_APP + 0x4b50;
     WNDPROC g_origProc = NULL;
+    HWND g_game = NULL;
     LRESULT CALLBACK AutoLoadProc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
     {
         if (msg == kMsgAutoLoad)
@@ -164,6 +186,7 @@ namespace
                     SetWindowPos(game, NULL, other.left + 40, other.top + 40, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
                     kp::Log("autoload: game window moved to the second monitor");
                 }
+                g_game = game;
                 g_origProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(game, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&AutoLoadProc)));
                 if (!g_origProc)
                 {
@@ -217,12 +240,14 @@ namespace kp
             {
                 unsigned int at = 0;
                 char kind[8] = "", name[128] = "";
-                if (sscanf_s(line, "at=%u %7s %127[^\n]", &at, kind, (unsigned)sizeof(kind), name, (unsigned)sizeof(name)) == 3 &&
-                    (strcmp(kind, "load") == 0 || strcmp(kind, "save") == 0))
+                int got = sscanf_s(line, "at=%u %7s %127[^\n]", &at, kind, (unsigned)sizeof(kind), name, (unsigned)sizeof(name));
+                int k = strcmp(kind, "load") == 0 ? 1 : strcmp(kind, "save") == 0 ? 2 : strcmp(kind, "stall") == 0 ? 3 :
+                        strcmp(kind, "quit") == 0 ? 4 : strcmp(kind, "select") == 0 ? 5 : 0;
+                if ((got == 3 && (k == 1 || k == 2 || (k == 3 && atoi(name) > 0) || k == 5)) || (got >= 2 && k == 4))
                 {
                     Step& s = g_steps[g_stepCount++];
                     s.atMs = at * 1000;
-                    s.kind = strcmp(kind, "load") == 0 ? 1 : 2;
+                    s.kind = k;
                     strcpy_s(s.name, sizeof(s.name), name);
                     s.done = false;
                 }
@@ -276,6 +301,28 @@ namespace kp
             Step& s = g_steps[i];
             if (s.done || now - g_worldSince < s.atMs) continue;
             s.done = true;
+            if (s.kind == 3)
+            {
+                unsigned int sec = static_cast<unsigned int>(atoi(s.name));
+                Log("autoload: step at %u s: stall - the main thread sleeps %u s (no frame runs)", s.atMs / 1000, sec);
+                ULONGLONG t0 = GetTickCount64();
+                Sleep(sec * 1000);
+                Log("autoload: stall over after %llu ms", GetTickCount64() - t0);
+                break;
+            }
+            if (s.kind == 5)
+            {
+                int r = SiteOk(KPS_PlayerInterface__selectPlayerCharacter) ? TrySelect(gw, atoi(s.name)) : -2;
+                Log("autoload: step at %u s: select squad member %d %s", s.atMs / 1000, atoi(s.name),
+                    r == 1 ? "asked" : (r == 0 ? "skipped (no player interface)" : (r == -2 ? "skipped (row unresolved)" : "FAULTED")));
+                break;
+            }
+            if (s.kind == 4)
+            {
+                BOOL ok = g_game && PostMessageW(g_game, WM_CLOSE, 0, 0);
+                Log("autoload: step at %u s: quit - WM_CLOSE to the game window %s", s.atMs / 1000, ok ? "posted" : "FAILED");
+                break;
+            }
             int r = s.kind == 1 ? TryLoad(s.name) : (SiteOk(KPS_SaveManager__save) ? TrySave(s.name) : -2);
             Log("autoload: step at %u s: %s \"%s\" %s", s.atMs / 1000, s.kind == 1 ? "load" : "save", s.name,
                 r == 1 ? "asked" : (r == 0 ? "skipped (no save manager)" : (r == -2 ? "skipped (row unresolved)" : "FAULTED")));
