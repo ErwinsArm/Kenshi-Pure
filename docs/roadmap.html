@@ -107,8 +107,8 @@ h2{font-size:1.25rem}
 <script>
 // Edit this object to update the page. status: done | now | todo
 const DATA = {
-  updated: "27 November 2026",
-  now: "M4 works: a borrowed townsperson in your game follows the test bot around you, walking with its own animation. I can now run game tests myself: the mod starts the save, Kenshi runs in a window on your second screen and closes again without saving. Next: M5, our own character for the other player instead of a borrowed one.",
+  updated: "28 November 2026",
+  now: "M5 works: when the other player joins, our own character for them appears in your game (named [KP] and their name), walks after them and disappears when they leave; loading a save is handled and saving never stores it. It keeps up much better than in M4. Next: M6, a test with a friend.",
   you: "Nothing right now. During my test runs Kenshi opens by itself on your second screen for about 5 minutes; please leave it alone, it closes by itself.",
   phases: [
     {name:"Learn from the old mod", note:"Read AnarchyKenshi to learn how a Kenshi multiplayer works. We only look; we never copy or run its files.", steps:[
@@ -129,7 +129,7 @@ const DATA = {
       {tag:"M2", name:"Our own small server", status:"done", d:"Done, checked by automatic tests on your PC (no game needed): a small server program that passes positions between up to 32 players ten times a second, and a test bot that walks in a circle. Our own message format, written down in the project. A position reaches the other player in about a tenth of a second (limit 0.3 s); leaving, wrong versions, a full server and broken messages are handled. The compiler it needs is unpacked into the project folder (1.6 GB, nothing installed into Windows)."},
       {tag:"M3", name:"Send and receive positions", status:"done", d:"Tested by you: your walk reached the server, the test bot's circle reached your game's log, and loading a save kept the connection. A separate network part of the mod keeps talking to the server even while the game freezes during loading; your position goes out ten times a second (nothing is shown in the game yet, that is M4). Server address and your name are in the mod's settings file. Automatic tests also pass: a 60-second freeze keeps the connection, the server going away and coming back reconnects."},
       {tag:"M4", name:"Move a stand-in character", status:"done", d:"A character in your game walks where the other player walks. Tested by you and by three automatic runs: a nearby townsperson (never one of yours) follows the test bot's circle, walking with its own animation; it is put forward only now and then. The way that works best is the game's normal walk order with the character's own mind on. A character can never be faster than its own top speed."},
-      {tag:"M5", name:"The other player appears", status:"todo", d:"The other player's character is created when they join and removed when they leave. The hardest step."},
+      {tag:"M5", name:"The other player appears", status:"done", d:"Checked by automatic tests and eight test runs on your PC: when the test bot joins, our own character for it appears ([KP] bot), follows it (on open ground almost exactly, around obstacles a little behind), and disappears when the bot leaves; when the bot comes back it appears again. Loading a save during the game works, and a save never keeps the character."},
       {tag:"M6", name:"Test with a friend", status:"todo", d:"Your friend connects to your PC over the internet and you see each other."}
     ]},
     {name:"Later", note:"Each becomes its own step after the first playable version works.", steps:[

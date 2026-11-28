@@ -256,6 +256,80 @@ to a non-primary monitor and asks `SaveManager::load(name)` through a message po
 frame hook and an Ogre frame listener do not run at the main menu, **M**); after the given seconds the script
 kills Kenshi without saving, restores `kenshi.cfg` (also one left by an aborted run) and prints the log lines.
 
+# Client: remote bodies (M5)
+
+Status: done (**M**: kp-remote-test without the game; eight unattended runs with `scripts/run-game-test.ps1`, build
+0.0.6-m5, 1.0.65 with RE_Kenshi, save "MP TEST" (save tests on the copy "KP TEST MP TEST"), `kp-bot --around-first
+--radius 300 --speed 60`). Each remote player gets an own body: built when its first poses arrive, driven, removed when
+the player leaves or goes quiet, never written into a save.
+
+**Pieces**
+- `client/Remote.{h,cpp}` (pure, both toolchains): `RemoteBodies` keeps per remote player `{player id, slot, state,
+  track, planner}`; the game adapter keeps one hand per slot, never a pointer. States: waiting → live → removing →
+  waiting/free; "given up" after 3 failed spawns. NetFrame feeds it (join, leave, session end, poses) and calls it each
+  frame; it is off while the M4 stand-in is on.
+- `client/RemoteGame.{h,cpp}`: the game calls, each in `__try`, on the frame thread; rows of feature
+  `optional:remote-write` in `client/sites.tsv` (all proven in 1.0.65 and 1.0.68).
+- Test: `net/test/RemoteTest.cpp` (kp-remote-test, 69 checks): settle time, spawn, drive with the raised max speed,
+  leave, no snapshot for 3 s, a pose older than 15 s, a world change (kept after the hand check, or forgotten; no game
+  call while there is no world), failed spawns, a destroy that does not remove, death, knock-out, faulting commands, the
+  session ending, range, the body limit, auto switching, pause, the sweep once per world.
+
+**Spawn** (G3 recipe, remote-bodies.md): faction by string id (`remote_faction`, default `nofac` = "No Faction",
+the faction `FactionManager::getEmptyFaction` returns), squad `Faction::createNewEmptyActivePlatoon(NULL, permanent,
+pos)` → `Platoon::getActivePlatoon()`, body `RootObjectFactory::createRandomCharacter(faction, pos, squad, NULL, NULL,
+1.0)` (template NULL = "random character base-copy"); faction read back; `clearAllAIGoals()` once; name `[KP] <player>`;
+hand built and checked; teleported to the pose. At most 8 bodies, one spawn per frame, only within `remote_range`
+(3000) of the own character and `remote_settle` (3 s) after the world appeared.
+
+**Drive**: every frame the body's max speed is set (`remote_maxspeed`, default 150; through `CharStats::moveSpeed`,
+`AnimationClass::setMaximumSpeed` and `AbstractMovementBase::maxSpeed`, the chain remote-bodies.md G5 measured), then
+one planner command. `remote_drive`:
+- `steer`: `setDirectMovement(unit direction, speed²)` with desired speed = |sender velocity + 2/s × gap|, capped at
+  1.5 × the sender's speed (200 when it stands); AI skipped. Place = `_setPositionSimple` + `teleportVisuallyOnly`.
+- `order`: M4's walk order (`Character::setDestination`, RUN, lead point 0.6 s ahead), AI on; the asked speed is held
+  every frame (the move job puts desired back to the walk speed between orders).
+- `auto` (default): steer; switch to order while stuck (gap > 40 and speed < 20 for 0.4 s, or gap > 150), back to steer
+  when the gap stays < 15 for 1 s.
+Snap past `remote_snap` (300).
+
+**Removal**: `GameWorld::destroy(body, false, "KenshiPure: remote player gone")` once on leave, session end, no
+snapshot for 3 s, a pose older than 15 s, out of range + 500, death, 10 s knocked out, 3 failed commands; the slot is
+freed when the hand stops resolving (asked again after 10 s, at most 3 times; never a new body while the old one may
+still stand).
+
+**World change**: no own character (menu, loading) or a new world epoch (load, or a 2 s stall) → no game call; once the
+world is back each hand is checked (resolves, not a player character, its `[KP]` name and its faction): kept, else
+forgotten. Once per world, after the settle time, characters named `[KP] …` that are not ours are destroyed (logged
+`STRAY`).
+
+**Saves (G7)**: `SaveManager::save` writes at once (`saveGame` ran 32 ms after the request, same thread, **M**); a body
+standing then is written into the save and comes back on load, also from a temporary squad (runs 5 and 7, **M**). Guard
+(`remote_save_guard`, default on): a detour on `SaveManager::saveGame` (its only caller is `SaveManager::execute`; the
+autosave goes through `save`, **M** xrefs) destroys every body first; the body is gone at once and the loaded save holds
+none (run 8, **M**). A forced `GameWorld::processKillList(true)` there crashed the game 0.5 s later in
+`Character::stumbleState` (run 6, **M**): not used. Bodies come back 5 s after a save.
+
+**Results (M)**, bot 60 units/s on a circle through two obstacles:
+
+| Run | Drive | gap to target mean | notes |
+|---|---|---|---|
+| M4 | order, own max ~52 | 107 | borrowed NPC |
+| 1–2 | order, max 150 | 62.5 / 63.3 | 0 snaps; gaps 100–280 only at the two obstacles (path around them), open ground 1–25 |
+| 3 | steer | 88.7 | open ground 0.1–3, stuck at the obstacles (speed 0) |
+| 4 | auto | **45.5** | gap > 100 in 16 % of status lines (order 26 %) |
+
+Lifecycle: leave → destroy returned 1, gone at once; rejoin (new id) → new body; in-world load → old hand forgotten,
+new body 3 s later; no fault in any run except run 6. Log: per body a status line a second (`remote: <name> (<id>)
+<mode> body … gap … lag … speed … max …`) and a summary at removal.
+
+**Test runs** (`scripts/run-game-test.ps1`, added for M5): `-Cfg "k=v;…"` (KenshiPure.cfg keys for one run, restored
+after; `standin` lines dropped), `-Steps "at=<s> save|load SAVE NAME;…"` (run by `client/AutoLoad.cpp` from the game
+window's messages, seconds after the world was entered), `-BotSeconds`, `-BotRestart`, `-SaveCopy`.
+
+Open: faction relations of "No Faction" towards local NPCs (no fight was seen, nothing tested); bodies far apart (zones);
+two real players (M6); the bot's circle, not a real player, made the measurements.
+
 # Client: live game probe
 
 Source: `client/Probe.cpp`, `client/Probe.h`; MCP side: `mcp/kenshi-probe.mjs`. Setup: `docs/setup.md`.

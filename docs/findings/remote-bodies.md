@@ -93,6 +93,9 @@ wrong (`Character_setOnScreenFlag`):
    AK pins the race by editing the template's race list around the call (`AK 0x2bdb90`
    "race-pin"); out of scope for M5.
 
+M5 (**M**): faction `nofac` = "No Faction" (`FactionManager::getEmptyFaction` `0x2e7ac0` is
+`getFactionByStringID("nofac")`; gamedata.base has the record), read back as asked; template NULL makes the factory
+look up "random character base-copy" ("random character base" for a player faction, `Faction+0x250`) (`0x582cb3..0x582d81`).
 Squad lifetime: AK and WoK pass `permanent = true` and never remove the squad (**M**). KL has
 `Faction::destroyPlatoon` / `removePlatoon` (**M**, header); nobody calls them for this, so whether to
 call one after the body is gone, and what `permanent` changes, is open (each join could otherwise
@@ -174,6 +177,22 @@ its walk speed (15); the body is capped at its own max speed (`+0xB4`, ~52). Ski
 without fault (the AI tick runs on another thread than the frame thread); a busy NPC needs its AI on to get up.
 **Use for M5: the walk order with the AI on, teleport snap.**
 
+M5 (1.0.65 exe `504b362cde850d56afb1cea6f5b7b0ee014d9dd7b47e188599d91c804502cd3e`, image base `0x140000000`; AK as above):
+- **Steering takes a direction, not a velocity** (**M**): `CharMovement::setDirectMovement` (`0x3332c0`) sets movement
+  mode 2, stores the vector at `+0x38C` and sqrt(float) at `+0x398`; `CharMovement::update` mode 2 (`0x65f64d..0x65f6da`)
+  calls `HavokCharacter::updateVelocity(+0x38C, dt)` (`0x147c60`), which multiplies the vector by `HavokCharacter+0x7C`,
+  set by `HavokCharacter::setDesiredSpeed` (`0x144070`) from min(desired `+0xBC`, max `+0xB4`) (`0x65f5c7..0x65f5ed`);
+  the step is cut when dt × |velocity| exceeds `+0x398`. AK passes a unit vector: `0x50c699` → `0x4fafb0(char, &dir, a, b)`,
+  dir = (vx/|v|, ·, vz/|v|) (`0x50c3c3..0x50c3ee`), |v| capped at min(1.5 × b, 200) (`0x50bd0a..0x50bd4e`), desired =
+  min(a, b) when b > 0.1, limit a or a² (flag AK `0x15a66de`). M4 passed the whole velocity, hence its odd speeds (**I**).
+- **Max speed chain** (**M**): `CharStats::calculateMaxRunSpeed` (`0x885590`) writes `CharStats::moveSpeed` (`+0x17C`;
+  athletics multiplier `+0x18`, encumbrance, overrides); `MedicalSystem::updateStats` (`0x644840`) and
+  `updateDamageState` (`0x645dd0`), the only callers of `AnimationClass::setMaximumSpeed` (`0x51bed0`, writes `+0x19C`),
+  pass it on; `CharMovement::periodicUpdate` (`0x66036c`) copies `animation(+0x3A0)->+0x19C` into `maxSpeed` `+0xB4`.
+  Writing all three every frame on our own body held 150 in game (**M**, [client.md](../client.md) "Remote bodies (M5)").
+- Runs (bot 60 units/s through two obstacles, gap to target mean): walk order 63, steer 89 (0.1–3 on open ground, stuck
+  at obstacles), auto (steer, walk order while stuck) **45.5**; M4 107 (**M**).
+
 ## Removal
 
 `GameWorld::destroy(obj, false, "reason")` on the main thread, once. All three agree on the call: AK
@@ -181,7 +200,9 @@ without fault (the AI tick runs on another thread than the frame thread); a busy
 `"coop-…"` (**M**); WoK `0`, "World of Kenshi: player left" (**M**, "verified" **D**). AK resolves
 the body from its stored `hand` right before the call (`0x321e48` `hand::getCharacter`, **M**).
 
-The engine removes it **later**, not at once: in the 1.0.68 exe, `destroy` puts the object into
+In the M5 runs `destroy` returned 1 and the hand stopped resolving in the same frame (leave, save guard; **M**), so for a
+character the immediate path was taken; the deferred path below exists (critic: a global test at `0x798fc3..0x798ff8`
+picks it), so M5 still waits for the hand to stop resolving. The engine can also remove it **later**: in the 1.0.68 exe, `destroy` puts the object into
 the kill lists (KL `killListPhase0` `+0x7D0`, branch at `0x799b82` that returns false;
 `killListPhase1` `+0x810` with the float 5.0 at `0x79a6ec`; a character also goes to
 `mainUpdateListRemovalQueue` `+0x888`), and `GameWorld::processKillList` frees it (**M**, both
@@ -199,10 +220,17 @@ character delete.
   load replaces the world's contents in place, and our stored bodies become invalid without any
   destructor call (**I**).
 - AK hooks `SaveManager::load(...)`, `save`, `newGame` as a "save-guard" (`AK 0xc11a40`, **M**);
-  KC hooks `SaveManager::load` to queue load edges (**M**). Open risk: a local save or autosave
-  while remote bodies exist may write them and their squads into the save, so they come back as
-  orphans on load (**I**). M5 tests it (save with a remote body present, reload, look for it);
-  fallbacks: remove our bodies before a save, or block saves as AK does.
+  KC hooks `SaveManager::load` to queue load edges (**M**).
+- **A save keeps a body** (**M**, M5 runs 5 and 7 on a save copy): a body standing when the game saves comes back on
+  load with its hand resolving, from a permanent or a temporary squad. `SaveManager::save` (`0x47b0b0`) leads at once
+  to `SaveManager::saveGame` (`0x375220`; its only caller `SaveManager::execute` `0x47c11b`; the autosave
+  `SaveManager::updateAutoSave` `0x47b95f` calls `save`) (**M** xrefs; "at once": the guard logged 32 ms after the request,
+  same thread). Fix used: destroy our bodies in a `saveGame` detour; the loaded save then holds none (run 8, **M**).
+  Forcing `GameWorld::processKillList(true)` there freed the body while the game still used it: access violation in
+  `Character::stumbleState` (`0x4351d0`) 0.5 s later (run 6, **M**).
+- A 2 s frame gap also starts a new world epoch in our pose reader, so M5 checks each hand after a world change
+  (resolves, not a player character, its `[KP]` name and faction) instead of forgetting blindly; after a real load the
+  old hand did not resolve to it (run 2, **M**).
 - KenshiLib also offers `GameWorld::resetGame()`, `_clearAndDestroyGameWorldStuff()`,
   `isLoadingFromASaveGame()` and the field `gameResetting` (`+0x8BA`) (**M**, header). No source
   uses them; a detour on `resetGame` may give an exact "world is going away" edge (**I**).

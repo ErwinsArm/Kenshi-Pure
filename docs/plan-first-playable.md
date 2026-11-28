@@ -116,7 +116,7 @@ KenshiCoop and WorldOfKenshi compared; calls by KenshiLib name, RVAs there are 1
 | G3 | How to spawn: arguments, template, faction, squad | **Closed statically** ([remote-bodies.md](findings/remote-bodies.md) G3): squad via `createNewEmptyActivePlatoon`, then `createRandomCharacter` with that squad as owner (AK and WoK agree, KenshiLib signatures). Open: 1.0.65 offsets, squad cleanup, faction read-back, by the first spawn run | Medium (was High; first run in M4/M5) |
 | G4 | How to stop the remote body's own AI (wandering, fleeing, fighting) from fighting our orders and the local player's orders | **Closed statically** (remote-bodies.md G4): detour `AI::periodicUpdate(float)` and skip our bodies (AK), fallback `Character::periodicUpdate` (KenshiCoop); `clearAllAIGoals` once; never `removeFromUpdateListMain`. Open: combat reactions, threads; runtime in M4 | Medium |
 | G5 | Which call makes a body *walk* naturally to a point, and how to correct drift | **Closed statically** (remote-bodies.md G5): two candidates for an M4 A/B, KenshiCoop's path walk (+ teleport snap) and AK's direct steering (+ place); speed unit calibrated in M4 | Medium |
-| G7 | World lifecycle (save load/unload, never touch stale pointers) and **zones** | **Partly closed** (remote-bodies.md G7, Removal): `~GameWorld` runs only at exit; detect reloads by an edge (KenshiCoop) or `resetGame`; keep hands, not pointers; `destroy` is deferred. Open: saves writing remote bodies, zones; runtime: M5 reload and save test, M6 starts both players together | Medium (crashes) |
+| G7 | World lifecycle (save load/unload, never touch stale pointers) and **zones** | **Closed except zones** (M5: a save keeps a body unless removed first, guard in `SaveManager::saveGame`; hands checked after a world change). Before: (remote-bodies.md G7, Removal): `~GameWorld` runs only at exit; detect reloads by an edge (KenshiCoop) or `resetGame`; keep hands, not pointers; `destroy` is deferred. Open: saves writing remote bodies, zones; runtime: M5 reload and save test, M6 starts both players together | Medium (crashes) |
 | G14 | ENet peer timeout vs. main-thread stalls of ~60 s | ENet gives up after 5–30 s of silence (pinned source, **M**); the client's network thread keeps servicing ENet during a stall: a 60 s frame-thread stall keeps the connection in `kp-core-test` (**M**); in game the ~19 s start and a ~6 s save load kept it (**M**); a long in-game stall not seen yet | Low (was Medium) |
 | G9 | Can two Kenshi instances run on one PC (Steam)? They would also share logs and the same game folder | Runtime, vanilla Kenshi, user approves and runs | Low: the test bot (M2) and a second PC are fallbacks |
 | G10 | Pause and game speed (up to ×20): a remote body moves only while the local game runs, at the local speed | M6 criterion: both players at the same speed, or speed sync is out of scope | Low |
@@ -196,7 +196,10 @@ not; a body is never faster than its own max speed; busy NPCs need their AI to g
 - Without the game: interpolation/correction tests with the fake game.
 - In game: the stand-in walks the bot's circle, animated, facing forward.
 
-**M5 – spawn and remove a remote body** (L; the longest part; needs G3, G4, G7)
+**M5 – spawn and remove a remote body** (L; needs G3, G4, G7) — **done** (kp-remote-test; eight unattended runs:
+an own body "[KP] bot" per remote player appears, follows (gap mean 45 with the auto drive, M4 107), goes on leave,
+comes back on rejoin; a load forgets it without game calls; a save no longer keeps it). Details: [client.md](client.md)
+"Remote bodies (M5)".
 - On PlayerJoined spawn a body at the pose, drive it as in M4; on PlayerLeft or disconnect remove
   it with `GameWorld::destroy(body, false, reason)` from the frame hook (main thread, never inside a worker-thread callback); drop
   all bodies on world unload, recreate on load. Recipe: [remote-bodies.md](findings/remote-bodies.md); most risk is in the spawn arguments
