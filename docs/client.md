@@ -258,10 +258,11 @@ kills Kenshi without saving, restores `kenshi.cfg` (also one left by an aborted 
 
 # Client: remote bodies (M5)
 
-Status: done (**M**: kp-remote-test without the game; eight unattended runs with `scripts/run-game-test.ps1`, build
-0.0.6-m5, 1.0.65 with RE_Kenshi, save "MP TEST" (save tests on the copy "KP TEST MP TEST"), `kp-bot --around-first
---radius 300 --speed 60`). Each remote player gets an own body: built when its first poses arrive, driven, removed when
-the player leaves or goes quiet, never written into a save.
+Status: done (**M**: kp-remote-test without the game; unattended runs with `scripts/run-game-test.ps1` on 1.0.65 with
+RE_Kenshi, save "MP TEST" (save tests on the copy "KP TEST MP TEST"), `kp-bot --around-first --radius 300 --speed 60`:
+eight runs with 0.0.6-m5, then the runs below with 0.0.7-m5). Each remote player gets an own body: built when its first
+poses arrive and only where the game has the zone loaded, driven, removed when the player leaves, goes quiet or walks
+out of the loaded zones; it stays in the world while the game saves and is never written into a save.
 
 **Pieces**
 - `client/Remote.{h,cpp}` (pure, both toolchains): `RemoteBodies` keeps per remote player `{player id, slot, state,
@@ -270,17 +271,19 @@ the player leaves or goes quiet, never written into a save.
   frame; it is off while the M4 stand-in is on.
 - `client/RemoteGame.{h,cpp}`: the game calls, each in `__try`, on the frame thread; rows of feature
   `optional:remote-write` in `client/sites.tsv` (all proven in 1.0.65 and 1.0.68).
-- Test: `net/test/RemoteTest.cpp` (kp-remote-test, 69 checks): settle time, spawn, drive with the raised max speed,
+- Test: `net/test/RemoteTest.cpp` (kp-remote-test): settle time, spawn, drive with the raised max speed,
   leave, no snapshot for 3 s, a pose older than 15 s, a world change (kept after the hand check, or forgotten; no game
   call while there is no world), failed spawns, a destroy that does not remove, death, knock-out, faulting commands, the
-  session ending, range, the body limit, auto switching, pause, the sweep once per world.
+  session ending, range, the body limit, auto switching, pause, the sweep once per world, loaded zones (no spawn outside, removal after 1 s outside).
 
 **Spawn** (G3 recipe, remote-bodies.md): faction by string id (`remote_faction`, default `nofac` = "No Faction",
 the faction `FactionManager::getEmptyFaction` returns), squad `Faction::createNewEmptyActivePlatoon(NULL, permanent,
-pos)` → `Platoon::getActivePlatoon()`, body `RootObjectFactory::createRandomCharacter(faction, pos, squad, NULL, NULL,
+pos)` (`remote_squad_permanent`, default 0 = temporary, see Squads) → `Platoon::getActivePlatoon()`, body `RootObjectFactory::createRandomCharacter(faction, pos, squad, NULL, NULL,
 1.0)` (template NULL = "random character base-copy"); faction read back; `clearAllAIGoals()` once; name `[KP] <player>`;
 hand built and checked; teleported to the pose. At most 8 bodies, one spawn per frame, only within `remote_range`
-(3000) of the own character and `remote_settle` (3 s) after the world appeared.
+(3000) of the own character, `remote_settle` (3 s) after the world appeared, and only where the zone is loaded
+(below). Each spawn logs the squad's string id and whether it is permanent, and how every faction near the body stands
+towards "No Faction".
 
 **Drive**: every frame the body's max speed is set (`remote_maxspeed`, default 150; through `CharStats::moveSpeed`,
 `AnimationClass::setMaximumSpeed` and `AbstractMovementBase::maxSpeed`, the chain remote-bodies.md G5 measured), then
@@ -294,21 +297,36 @@ one planner command. `remote_drive`:
 Snap past `remote_snap` (300).
 
 **Removal**: `GameWorld::destroy(body, false, "KenshiPure: remote player gone")` once on leave, session end, no
-snapshot for 3 s, a pose older than 15 s, out of range + 500, death, 10 s knocked out, 3 failed commands; the slot is
+snapshot for 3 s, a pose older than 15 s, out of range + 500, death, 10 s knocked out, 3 failed commands, 1 s outside the loaded zones; the slot is
 freed when the hand stops resolving (asked again after 10 s, at most 3 times; never a new body while the old one may
 still stand).
 
+**Loaded zones and squads (M, 1.0.65 exe)**: `ActivePlatoon::unloadCheck` (`0x4fe140`) keeps a squad while
+its position lies in a loaded (or loading) zone's bounds minus 170 units of unloaded edges (or where there is no zone
+map); otherwise a 4.5 s timer runs out and `ActivePlatoon::update` returns false. An empty squad of a non-player faction
+also returns false (`0x4ff995..0x4ff9ad`). `Faction::updateActivePlatoons` (`0x6ba810`) then deactivates a permanent
+squad (it stays as an unloaded squad and would come back later as a body nobody drives) and destroys a temporary one
+(`Faction::destroyPlatoon`). So our squads are temporary, `RemoteGameLoadedAt` repeats the zone test (rows
+`GameWorld::zoneMgr`, `ZoneManager::getZoneMap`, `ZoneMap::isLoadedMT` / `isBeingLoadedMT` /
+`getBoundsMinusUnloadedEdges`), no body is built outside the loaded zones, and a body that stands outside for 1 s is
+removed by us (before the game's 4.5 s) and built again once the remote pose is back inside.
+
 **World change**: no own character (menu, loading) or a new world epoch (load, or a 2 s stall) → no game call; once the
 world is back each hand is checked (resolves, not a player character, its `[KP]` name and its faction): kept, else
-forgotten. Once per world, after the settle time, characters named `[KP] …` that are not ours are destroyed (logged
-`STRAY`).
+forgotten. Once per world, after the settle time, characters of our faction named `[KP] …` that are not ours are destroyed
+(logged `STRAY`; only a save written by 0.0.6-m5 or older can hold one).
 
-**Saves (G7)**: `SaveManager::save` writes at once (`saveGame` ran 32 ms after the request, same thread, **M**); a body
-standing then is written into the save and comes back on load, also from a temporary squad (runs 5 and 7, **M**). Guard
-(`remote_save_guard`, default on): a detour on `SaveManager::saveGame` (its only caller is `SaveManager::execute`; the
-autosave goes through `save`, **M** xrefs) destroys every body first; the body is gone at once and the loaded save holds
-none (run 8, **M**). A forced `GameWorld::processKillList(true)` there crashed the game 0.5 s later in
-`Character::stumbleState` (run 6, **M**): not used. Bodies come back 5 s after a save.
+**Saves (G7)**: a body standing while the game saves would be written into the save and come back on load, from a
+permanent or a temporary squad (0.0.6-m5 runs 5 and 7, **M**). The save path (**M**, 1.0.65 exe): `Faction::saveState`
+(`0x372920`) calls `Platoon::serialiseEverything` (vtable `0xB8`, base `0x372db0`) for each of its squads and ignores
+the result (`0x372d05`, `0x372d54`); that function writes the squad's record and, through
+`ActivePlatoon::serialiseEverythingToDisk` → `saveToDisk` (their only callers), its file `platoon/<id>.platoon` with
+the characters; for squads it does not save (dead ones far from the player) it returns NULL itself (`0x372dfb..0x372ef9`).
+`remote_save_guard` (default on) detours it: for one of our squads (address and the platoon's string id as recorded at
+spawn; entries outlive the body, so an empty squad is skipped too) it takes that same NULL path. The body keeps walking
+through the save and the loaded save holds none (runs below). The earlier guard (destroy every body in a
+`SaveManager::saveGame` detour; bodies came back 5 s later) is gone; a forced `GameWorld::processKillList(true)` there
+had crashed the game in `Character::stumbleState` (0.0.6-m5 run 6, **M**).
 
 **Results (M)**, bot 60 units/s on a circle through two obstacles:
 
@@ -319,6 +337,17 @@ none (run 8, **M**). A forced `GameWorld::processKillList(true)` there crashed t
 | 3 | steer | 88.7 | open ground 0.1–3, stuck at the obstacles (speed 0) |
 | 4 | auto | **45.5** | gap > 100 in 16 % of status lines (order 26 %) |
 
+0.0.7-m5 runs (**M**): (1) save at 60 s: "the save skips our squad No Faction_0" 155 ms after the request, a status
+line every second through the save; load: "kept 0 bodies", no STRAY, new body 3 s later, gap mean 44.1. (2) leave, load,
+rejoin: destroyed at once, new body after the load. (3) leave, save 36 s later: no squad skipped, so the game had
+destroyed the empty temporary squad; load: no STRAY. Relations of the 13 factions near the test spot (Dust Bandits,
+Starving Bandits, Holy Nation Outlaws, Nomads, the player's "Nameless", …) towards "No Faction": -10 to 0, none at the
+enemy line -30 (`FactionRelations::isEnemy` is relation <= -30, `0x6b23b3`, **M**). (4) circle radius 3500 at 140 units/s
+(`remote_range=8000`): 225 status lines, the save skipped the squad, the body never left the loaded zones (they reach past
+3500 here); gap mean 141 (the bot near the body's max 150). (5) radius 6500 (`remote_range=20000`): "outside the loaded
+zones - waiting", a body once the pose was inside, "it left the loaded zones" 1 s after it stood outside, gone at once,
+built again when the pose came back in (twice in 5 minutes). No fault in any run.
+
 Lifecycle: leave → destroy returned 1, gone at once; rejoin (new id) → new body; in-world load → old hand forgotten,
 new body 3 s later; no fault in any run except run 6. Log: per body a status line a second (`remote: <name> (<id>)
 <mode> body … gap … lag … speed … max …`) and a summary at removal.
@@ -327,8 +356,8 @@ new body 3 s later; no fault in any run except run 6. Log: per body a status lin
 after; `standin` lines dropped), `-Steps "at=<s> save|load SAVE NAME;…"` (run by `client/AutoLoad.cpp` from the game
 window's messages, seconds after the world was entered), `-BotSeconds`, `-BotRestart`, `-SaveCopy`.
 
-Open: faction relations of "No Faction" towards local NPCs (no fight was seen, nothing tested); bodies far apart (zones);
-two real players (M6); the bot's circle, not a real player, made the measurements.
+Open: relations measured at one spot only (a faction elsewhere could stand at -30 or below; nothing makes ours neutral
+yet); two real players (M6); the bot's circle, not a real player, made the measurements.
 
 # Client: live game probe
 

@@ -96,13 +96,17 @@ wrong (`Character_setOnScreenFlag`):
 M5 (**M**): faction `nofac` = "No Faction" (`FactionManager::getEmptyFaction` `0x2e7ac0` is
 `getFactionByStringID("nofac")`; gamedata.base has the record), read back as asked; template NULL makes the factory
 look up "random character base-copy" ("random character base" for a player faction, `Faction+0x250`) (`0x582cb3..0x582d81`).
-Squad lifetime: AK and WoK pass `permanent = true` and never remove the squad (**M**). KL has
-`Faction::destroyPlatoon` / `removePlatoon` (**M**, header); nobody calls them for this, so whether to
-call one after the body is gone, and what `permanent` changes, is open (each join could otherwise
-leave an empty permanent squad, **I**).
+Squad lifetime (**M**, 1.0.65 exe): AK and WoK pass `permanent = true` and never remove the squad. The game removes
+squads itself: `ActivePlatoon::update` (`0x4ff930`) returns false for an empty squad of a non-player faction and when
+`ActivePlatoon::unloadCheck` (`0x4fe140`) has found it outside the loaded zones for 4.5 s (bounds minus 170 units of
+unloaded edges; no zone map there = stays); `Faction::updateActivePlatoons` (`0x6ba810`) then calls
+`Platoon::deactivate` for a permanent squad (characters serialised and destroyed, the squad stays unloaded and can come
+back) and `Faction::destroyPlatoon` (deferred delete) for a temporary one. So M5 builds temporary squads; an empty one
+was gone 36 s after its body (M5 run 3, **M**).
 
-Not solved statically: whether a body built into its own squad near the player is ticked when the
-player walks away (zones, G7), and which faction relations make local NPCs ignore it.
+Relations (**M**): `FactionRelations::isEnemy` is "relation <= -30" (`0x6b23b3`, the float at `0x16cbcfc`); with no
+data for a faction the default at `FactionRelations+0x60` is used. At the test spot 13 factions stood at -10..0 towards
+"No Faction" (M5 runs).
 
 ## G4 – keeping the body's own AI out
 
@@ -200,7 +204,7 @@ M5 (1.0.65 exe `504b362cde850d56afb1cea6f5b7b0ee014d9dd7b47e188599d91c804502cd3e
 `"coop-…"` (**M**); WoK `0`, "World of Kenshi: player left" (**M**, "verified" **D**). AK resolves
 the body from its stored `hand` right before the call (`0x321e48` `hand::getCharacter`, **M**).
 
-In the M5 runs `destroy` returned 1 and the hand stopped resolving in the same frame (leave, save guard; **M**), so for a
+In the M5 runs `destroy` returned 1 and the hand stopped resolving in the same frame (leave, the old save guard, leaving the loaded zones; **M**), so for a
 character the immediate path was taken; the deferred path below exists (critic: a global test at `0x798fc3..0x798ff8`
 picks it), so M5 still waits for the hand to stop resolving. The engine can also remove it **later**: in the 1.0.68 exe, `destroy` puts the object into
 the kill lists (KL `killListPhase0` `+0x7D0`, branch at `0x799b82` that returns false;
@@ -221,11 +225,14 @@ character delete.
   destructor call (**I**).
 - AK hooks `SaveManager::load(...)`, `save`, `newGame` as a "save-guard" (`AK 0xc11a40`, **M**);
   KC hooks `SaveManager::load` to queue load edges (**M**).
-- **A save keeps a body** (**M**, M5 runs 5 and 7 on a save copy): a body standing when the game saves comes back on
-  load with its hand resolving, from a permanent or a temporary squad. `SaveManager::save` (`0x47b0b0`) leads at once
+- **A save keeps a body** unless its squad is left out (**M**, M5 runs 5 and 7 on a save copy): a body standing when the
+  game saves comes back on load with its hand resolving, from a permanent or a temporary squad. The writer is
+  `Platoon::serialiseEverything` (`0x372db0`), called per squad by `Faction::saveState` (`0x372920`, result ignored);
+  it returns NULL for squads it does not save, and M5's detour takes that path for ours (the body stays; [client.md](../client.md)
+  "Remote bodies (M5)"). Before that, M5 destroyed the bodies in a `saveGame` detour: `SaveManager::save` (`0x47b0b0`) leads at once
   to `SaveManager::saveGame` (`0x375220`; its only caller `SaveManager::execute` `0x47c11b`; the autosave
   `SaveManager::updateAutoSave` `0x47b95f` calls `save`) (**M** xrefs; "at once": the guard logged 32 ms after the request,
-  same thread). Fix used: destroy our bodies in a `saveGame` detour; the loaded save then holds none (run 8, **M**).
+  same thread); the loaded save then held none (run 8, **M**), but bodies vanished for 5 s at every save.
   Forcing `GameWorld::processKillList(true)` there freed the body while the game still used it: access violation in
   `Character::stumbleState` (`0x4351d0`) 0.5 s later (run 6, **M**).
 - A 2 s frame gap also starts a new world epoch in our pose reader, so M5 checks each hand after a world change
@@ -242,8 +249,8 @@ character delete.
 - Never keep a bare `Character*` across frames: store the body's `hand` (`RootObjectBase::getHandle`)
   and re-resolve with `hand::getCharacter()` each use; a destroyed body's hand stops resolving
   (KC pitfall §15, written about ground items, extended here to characters, **I**; AK keeps hands and calls `hand_characterPtr` before each use, **M**).
-- Zones: KC uses 4608-unit zone cells (**D**); bodies in unloaded zones are destroyed by the game
-  ("corpse unloaded", AK strings, **M**). M6 keeps both players together.
+- Zones: KC uses 4608-unit zone cells (**D**); a squad outside the loaded zones is unloaded after 4.5 s (Squad lifetime
+  above, **M**); M5 builds no body there and removes one after 1 s outside.
 - What only a run shows: whether our frame hook runs during the load screen (KC logs it as a probe),
   and how long the not-live gap is.
 
