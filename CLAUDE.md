@@ -80,6 +80,9 @@ inferred (see "Evidence").
 - Decide *how* yourself; ask only when the answer changes the work. *What* (goal, scope, anything
   outward-facing: pushes of third-party code, posting) is the user's call.
 - Build or analyse what the user names. Think another way is better? Say so with evidence first.
+- The bar is the best multiplayer possible: a step is "done" only with no known workaround, no crash and no gap
+  the user has not accepted. Meeting the plan's checklist is not enough. Known gap → fix it (look for the game's own
+  way first) or name it plainly and ask; never mark it done in notes, roadmap or a reply.
 - What the user saw (in game, in a tool) is data; never overrule it with an inference. Stop when
   their bar is met; further ideas are proposals.
 - Told to work alone ("use up my usage"): don't wait for answers; take the sensible default, note
