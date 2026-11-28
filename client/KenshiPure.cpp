@@ -21,8 +21,9 @@
 #include "AutoLoad.h"
 #include "Cheat.h"
 #include "Perf.h"
+#include "SpeedLock.h"
 
-#define KP_VERSION "0.0.8-m5"
+#define KP_VERSION "0.0.8-m6"
 
 namespace
 {
@@ -183,8 +184,10 @@ namespace
         }
         if (g_abi != ABI_FAIL) kp::PoseOnFrame(gw);
         kp::NetOnFrame();
+        bool connected = kp::NetConnected();
+        if (g_abi != ABI_FAIL) kp::SpeedLockOnFrame(gw, connected);
         if (g_abi != ABI_FAIL) kp::AutoLoadOnFrame(gw);
-        if (g_abi != ABI_FAIL) kp::CheatOnFrame(gw);
+        if (g_abi != ABI_FAIL) kp::CheatOnFrame(gw, connected);
         if (g_abi != ABI_FAIL && kp::FeatureOn("optional:probe")) kp::ProbeOnFrame(gw, g_frames, g_frameThread);
     }
 
@@ -238,6 +241,7 @@ extern "C" __declspec(dllexport) int kpStart(const KpHost* host)
     kp::PoseInit();
     kp::NetStart();
     kp::PerfStart(&g_frames);   // after NetStart: the first line shows the timer with ENet's request
+    kp::SpeedLockInit();
     kp::AutoLoadInit();
     kp::CheatInit(host);
     if (kp::FeatureOn("optional:probe")) kp::ProbeStart();

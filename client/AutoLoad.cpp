@@ -18,10 +18,12 @@ namespace
     // Later steps of a test run (lines after the first in autoload.txt): "at=<s> load <save>",
     // "at=<s> save <save>", "at=<s> stall <seconds>" (the main thread sleeps: no frame runs, as in a
     // long load), "at=<s> select <n>" (selects member n of the squad, as the game's number keys do) or
-    // "at=<s> quit" (WM_CLOSE to the game window, as its close button), seconds after the
+    // "at=<s> quit" (WM_CLOSE to the game window, as its close button), "at=<s> speed <x>"
+    // (GameWorld::setGameSpeed(x, false)), "at=<s> pause <any>" / "at=<s> unpause <any>" (GameWorld::userPause;
+    // while connected the M6 speed lock drops this pause: not the editor), seconds after the
     // first world was entered. Run from the game window's messages (the main thread, outside the frame
     // hook), like the first load.
-    struct Step { unsigned int atMs; int kind; char name[128]; bool done; };   // kind 1 load, 2 save, 3 stall, 4 quit, 5 select
+    struct Step { unsigned int atMs; int kind; char name[128]; bool done; };   // kind 1 load, 2 save, 3 stall, 4 quit, 5 select, 6 speed, 7 pause, 8 unpause
     Step g_steps[16];
     int g_stepCount = 0;
     unsigned long long g_worldSince = 0;
@@ -42,6 +44,21 @@ namespace
             PlayerInterface* pi = KP_FIELD(gw, GameWorld, player);
             if (!pi) return 0;
             pi->selectPlayerCharacter(index, false, false);
+            return 1;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return -1;
+        }
+    }
+
+    // 1 done, -1 faulted.
+    int TrySpeed(GameWorld* gw, int kind, float x)
+    {
+        __try
+        {
+            if (kind == 6) gw->setGameSpeed(x, false);
+            else gw->userPause(kind == 7);
             return 1;
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
@@ -242,8 +259,9 @@ namespace kp
                 char kind[8] = "", name[128] = "";
                 int got = sscanf_s(line, "at=%u %7s %127[^\n]", &at, kind, (unsigned)sizeof(kind), name, (unsigned)sizeof(name));
                 int k = strcmp(kind, "load") == 0 ? 1 : strcmp(kind, "save") == 0 ? 2 : strcmp(kind, "stall") == 0 ? 3 :
-                        strcmp(kind, "quit") == 0 ? 4 : strcmp(kind, "select") == 0 ? 5 : 0;
-                if ((got == 3 && (k == 1 || k == 2 || (k == 3 && atoi(name) > 0) || k == 5)) || (got >= 2 && k == 4))
+                        strcmp(kind, "quit") == 0 ? 4 : strcmp(kind, "select") == 0 ? 5 :
+                        strcmp(kind, "speed") == 0 ? 6 : strcmp(kind, "pause") == 0 ? 7 : strcmp(kind, "unpause") == 0 ? 8 : 0;
+                if ((got == 3 && (k == 1 || k == 2 || (k == 3 && atoi(name) > 0) || k >= 5)) || (got >= 2 && k == 4))
                 {
                     Step& s = g_steps[g_stepCount++];
                     s.atMs = at * 1000;
@@ -321,6 +339,14 @@ namespace kp
             {
                 BOOL ok = g_game && PostMessageW(g_game, WM_CLOSE, 0, 0);
                 Log("autoload: step at %u s: quit - WM_CLOSE to the game window %s", s.atMs / 1000, ok ? "posted" : "FAILED");
+                break;
+            }
+            if (s.kind >= 6)
+            {
+                static const char* const kKinds[] = { "speed", "pause", "unpause" };
+                int r = FeatureOn("optional:speedlock-write") ? TrySpeed(gw, s.kind, (float)atof(s.name)) : -2;
+                Log("autoload: step at %u s: %s \"%s\" %s", s.atMs / 1000, kKinds[s.kind - 6], s.name,
+                    r == 1 ? "asked" : (r == -2 ? "skipped (row unresolved)" : "FAULTED"));
                 break;
             }
             int r = s.kind == 1 ? TryLoad(s.name) : (SiteOk(KPS_SaveManager__save) ? TrySave(s.name) : -2);

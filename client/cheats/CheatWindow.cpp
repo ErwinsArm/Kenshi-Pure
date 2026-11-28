@@ -19,7 +19,7 @@
 #include "Log.h"
 #include "Sites.h"
 
-#define KP_CHEATS_VERSION "0.1.0-window"
+#define KP_CHEATS_VERSION "0.1.1-window"
 
 namespace
 {
@@ -179,6 +179,17 @@ namespace
         __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
     }
 
+    __declspec(noinline) void HideWindow()
+    {
+        g_window->setVisible(false);
+    }
+
+    bool SafeHide()
+    {
+        __try { HideWindow(); return true; }
+        __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    }
+
     bool SafeRefresh(const char* charName, const char* status)
     {
         __try { Refresh(charName, status); return true; }
@@ -286,4 +297,15 @@ extern "C" __declspec(dllexport) void kpCheatFrame(GameWorld* gw)
         kp::cheat::SelectedName(gw, name, sizeof(name));
         if (!SafeRefresh(name, kp::cheat::LastResult())) Failed("updating the window");
     }
+}
+
+// Multiplayer (KenshiPure is connected to a server): no cheat runs for the rest of this game run. Drops a queued
+// click, hides the window and turns kpCheatFrame into a no-op. Game thread.
+extern "C" __declspec(dllexport) void kpCheatStop()
+{
+    if (!g_on) return;
+    g_on = false;
+    g_pending = A_NONE;
+    if (g_state == W_SHOWN && !SafeHide()) g_state = W_FAILED;
+    kp::Log("cheats: off for the rest of this game run (connected to a multiplayer server)");
 }

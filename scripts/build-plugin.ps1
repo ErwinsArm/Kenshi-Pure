@@ -61,7 +61,8 @@ function Invoke-Compile([string]$name, [string[]]$files, [string[]]$extra = @())
 }
 function Invoke-Link([string]$outFile, [string[]]$objs, [string[]]$libs, [string[]]$extra = @()) {
     $pdb = [IO.Path]::ChangeExtension($outFile, ".pdb")
-    & $Tc.Link @(@("/nologo", "/OUT:$outFile", "/MANIFEST:NO", "/DEBUG", "/OPT:REF", "/OPT:ICF", "/PDB:$pdb") + $extra + $objs + $libs)
+    # /PDBALTPATH: the DLL names only the .pdb file, not this PC's folder (the DLLs go to other PCs in the package).
+    & $Tc.Link @(@("/nologo", "/OUT:$outFile", "/MANIFEST:NO", "/DEBUG", "/OPT:REF", "/OPT:ICF", "/PDB:$pdb", "/PDBALTPATH:%_PDB%") + $extra + $objs + $libs)
     if ($LASTEXITCODE -ne 0) { Stop-ToolchainHelpers; throw "link of $outFile failed ($LASTEXITCODE)" }
 }
 
@@ -121,7 +122,7 @@ $exp = Get-Dump $dll "/exports"
 if ($exp -notmatch "\bkpStart\b") { $problems += "KenshiPure.dll does not export kpStart" }
 if ($exp -match "startPlugin") { $problems += "KenshiPure.dll still exports RE_Kenshi's startPlugin" }
 $cexp = Get-Dump $cheatDll "/exports"
-foreach ($e in @("kpCheatStart", "kpCheatFrame")) { if ($cexp -notmatch "\b$e\b") { $problems += "KenshiPureCheats.dll does not export $e" } }
+foreach ($e in @("kpCheatStart", "kpCheatFrame", "kpCheatStop")) { if ($cexp -notmatch "\b$e\b") { $problems += "KenshiPureCheats.dll does not export $e" } }
 # Every MyGUI symbol the cheats DLL imports must be exported by the game's own MyGUIEngine_x64.dll.
 $gameMygui = Join-Path $GameDir "MyGUIEngine_x64.dll"
 if (Test-Path -LiteralPath $gameMygui) {

@@ -305,6 +305,14 @@ namespace kp
         }
     }
 
+    int NetFrame::CoreState() const
+    {
+        if (!core_) return KP_CORE_STOPPED;
+        KpCoreStatus s;
+        api_->status(core_, &s);
+        return s.state;
+    }
+
     void NetFrame::OnFrame(unsigned long long nowMs)
     {
         if (!core_) return;

@@ -21,4 +21,6 @@ extern "C"
     typedef int (*KpCheatStartFn)(const KpCheatHost* host);
     // Called on the game thread after each game frame.
     typedef void (*KpCheatFrameFn)(GameWorld* gw);
+    // Switches the cheats off for the rest of the game run (multiplayer); game thread. Optional for the host.
+    typedef void (*KpCheatStopFn)();
 }

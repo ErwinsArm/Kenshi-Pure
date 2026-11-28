@@ -400,6 +400,83 @@ prints its exit code, the loader's stop line, the server's leave line and any ne
 Open: relations measured at one spot only (a faction elsewhere could stand at -30 or below; nothing makes ours neutral
 yet); two real players (M6); the bot's circle, not a real player, made the measurements.
 
+# Client: game speed (M6)
+
+The user's rule (plan G10): while connected to a server the game runs at x1 and the player cannot pause it. A remote
+body moves only while the local game runs and at its speed, so two players at different speeds would see each other
+trail or jump. `client/SpeedLock.{h,cpp}`, feature `optional:speedlock-write` (rows `GameWorld::userPause`,
+`setGameSpeed`, `togglePause`, `processKeys`, `DialogueWindow::show(Dialogue)`, `CharacterEditWindow::initCharacters`,
+`BuildMode::pauseOnOpen`; all proven in 1.0.65 and 1.0.68).
+
+How the game sets speed and pause (**M**, disassembly of both exes; 1.0.65 RVAs from KenshiLib's address map):
+- Speed is `GameWorld+0x700` (`getFrameSpeedMultiplier`), paused is `+0x8B9` (`isPaused`). `setGameSpeed(s, click)`
+  (`0x787300`) writes the speed, then calls `togglePause(s == 0)`; `togglePause(on)` (`0x787200`) sets
+  paused = on || speed == 0. `userPause(p)` (`0x787470`) sets the speed to 0 (p) or back to the speed saved before the
+  pause, with the same tail.
+- Every direct caller (calls and jumps to the functions and their incremental-link thunks, whole `.text`, the same set
+  in both exes): `userPause(true)` from `GameWorld::processKeys` (`0x7875c0`, the pause key toggles),
+  `DialogueWindow::show(Dialogue*)`, `CharacterEditWindow::initCharacters` (a new game's editor) and the level editor;
+  `setGameSpeed` from `processKeys` (speed keys), `MainBarGUI::changeSpeed` (buttons, tail jump) and the editor's confirm
+  (1.0); `togglePause(true)` from the build mode (`0x4e5b50`, 1.0.68 `0x4e65e0`, no KenshiLib name; called from
+  `MainBarGUI::buildButton` and `processKeys`, so opening the build mode pauses the game), `SaveManager::loadGame`,
+  `ZoneManager::processLoading`, `ZoneManager::activateAllActiveZones` (tail jump), two functions reached only
+  indirectly (`0x913274` near `LoadingWindow`, `0x4d0e90`), and the tails of `setGameSpeed` / `userPause`.
+  `togglePause(true)` alone leaves the speed as it is.
+
+Lock (from the first frame the core is welcomed, `NetConnected()`, until the game exits; latched like the cheats, so a
+dropped connection opens no window for pause or speed); a caller is the function whose `.pdata` entry holds the
+return address (`RtlLookupFunctionEntry`; the call sites above lie inside the named functions in both exes, **M**):
+- `userPause(true)` passes only from the character editor; every other is dropped and logged (`speed: pause blocked
+  (pause key|dialogue|another caller)`). After `userPause(false)` the speed is set back to x1.
+- `setGameSpeed(s)` with s != 1 runs as `setGameSpeed(1)` (logged).
+- `togglePause(true)` from the build mode is dropped (`pause blocked (build mode)`); the loading pauses stay (they keep
+  the world from running half loaded).
+- Each frame: a speed other than 1 (from before the connection, or a path not found statically) is set to x1, except
+  while the editor's pause holds or the game paused itself (paused with a speed above 0: calling `setGameSpeed` would
+  end that pause through `togglePause`). Every change of speed or pause is logged (`speed: now x… paused|running`), at
+  most one frame line per 500 ms.
+- Not covered: a call through a function pointer to these functions (none found statically).
+- `sites.mjs` code rows for functions without a KenshiLib name: `--sym rva65:0x…` (the 1.0.65 start must begin a `.pdata`
+  entry, the 1.0.68 match too; no thunk is generated).
+- Test steps for `scripts/run-game-test.ps1 -Steps`: `at=<s> speed <x>`, `at=<s> pause x`, `at=<s> unpause x` call
+  `setGameSpeed` / `userPause` from the plugin (while connected the pause is dropped as "another caller"; the pause key,
+  dialogue and build mode paths are covered only by a player).
+
+# Client: multiplayer package (M6)
+
+`scripts/make-package.ps1` builds `build\package\KenshiPure-<version>\` and its `.zip` for a PC without build tools or
+this repo: `Install KenshiPure.cmd` / `Uninstall KenshiPure.cmd` (run `files\install-client.ps1 -Ask`), `files\` (the
+three DLLs, the install script, `lib\CfgEdit.ps1`, `builds.txt` = the `#build` lines of `client/sites.tsv`), `server\`
+(`kp-server.exe`, `Start server.cmd`: port 27850, `--log-poses`, appends to `kp-server.log`), `README.txt`,
+`LICENSE.txt`, `SHA256SUMS.txt`. The script refuses a package holding a cheat DLL, a `.pdb` or any file that contains
+this PC's user name, user folder or repo path (`build-plugin.ps1` links with `/PDBALTPATH:%_PDB%`, so the DLLs name
+only their `.pdb` file, **M**: no user path left in the three DLLs).
+
+`install-client.ps1` runs from the repo and from the package (package mode: the DLLs lie next to it):
+- `-ServerHost`, `-Port`, `-PlayerName` replace those lines of `KenshiPure.cfg` in place (other lines kept); names are
+  1-32 printable ASCII characters without `#` or `=`; `-Ask` asks for the Kenshi folder, the server address and the
+  name when not given (earlier values as default).
+- Without `-GameDir` it looks for `steamapps\common\Kenshi` in Steam's folder (registry) and the libraries of
+  `libraryfolders.vdf`.
+- Before installing it hashes the exe the game will run (RE_Kenshi's copy while `Plugin=RE_Kenshi` is on, else
+  `kenshi_x64.exe`) and stops without changes when the build is not one of `builds.txt` / `sites.tsv`.
+- Unblocks the copied DLLs (the "from the internet" mark of a downloaded zip); `-Cheats` is refused without a cheat
+  DLL. Pester tests: 11 (`scripts/tests`), including a package folder against a fake Kenshi folder.
+
+Steps for the two people: [playing-together.md](playing-together.md).
+
+**Runs (M)**, 0.0.8-m6 installed from the package (host 127.0.0.1), `scripts/run-game-test.ps1 -SaveCopy -Steps "at=20 speed
+3;at=30 pause x;at=40 unpause x;at=55 save SAVE NAME"`, save "MP TEST", bot 60 units/s:
+
+| Run | Build | welcomed | lock | x3 step | pause step | save | body gap mean |
+|---|---|---|---|---|---|---|---|
+| A | 1.0.65 (RE_Kenshi) | 0.2 s after start | on the first connected frame | kept at x1, no speed change after | blocked (another caller) | skipped our squad | 50.2 (133 lines) |
+| B | 1.0.68 (`-NoReKenshi`, Steam's exe) | 0.2 s | same | same | same | same | 46.8 (130 lines) |
+
+No exception in either run; `Plugins_x64.cfg` came back with its RE_Kenshi line. Not covered by a run: the pause key,
+the speed buttons, a dialogue, the build mode and a new game's character editor (they need a player), two real
+clients (G9: Steam starts one Kenshi per PC and both would write the same log; not tried).
+
 # Client: live game probe
 
 Source: `client/Probe.cpp`, `client/Probe.h`; MCP side: `mcp/kenshi-probe.mjs`. Setup: `docs/setup.md`.
@@ -523,8 +600,10 @@ it); without the file KenshiPure logs `cheat: not installed` and nothing changes
   **I**); teleport to camera centre lands on target (0.0 x/z after 1 s). The user saw no problem.
 - Not checked yet: the same on 1.0.68, text fitting at other UI scales, whether Ctrl+Shift+C does something
   in Kenshi too.
-- Single-player only by intent: nothing stops it in a multiplayer session yet (needed before playing with
-  others).
+- Single-player only: once KenshiPure is welcomed by a server, `CheatHost` calls the DLL's `kpCheatStop` (drops a
+  queued click, hides the window, `kpCheatFrame` does nothing more) and stops forwarding frames for the rest of the
+  game run, also after a disconnect (`cheat: off for the rest of this game run`). The multiplayer package has no
+  cheat DLL at all.
 
 ## The probe's three bugs: causes and fixes
 

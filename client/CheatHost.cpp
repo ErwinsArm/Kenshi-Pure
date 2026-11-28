@@ -10,6 +10,7 @@
 namespace
 {
     KpCheatFrameFn g_frame = NULL;
+    KpCheatStopFn g_stop = NULL;
 }
 
 namespace kp
@@ -47,11 +48,22 @@ namespace kp
             return;
         }
         g_frame = frame;   // the DLL stays loaded for the whole game
+        g_stop = (KpCheatStopFn)GetProcAddress(m, "kpCheatStop");
         Log("cheat: KenshiPureCheats.dll started (window and log: KenshiPureCheats.log)");
     }
 
-    void CheatOnFrame(GameWorld* gw)
+    void CheatOnFrame(GameWorld* gw, bool connected)
     {
-        if (g_frame) g_frame(gw);
+        if (!g_frame) return;
+        if (connected)
+        {
+            // Multiplayer: no cheats for the rest of this run (also after a disconnect).
+            if (g_stop) g_stop();
+            g_frame = NULL;
+            Log("cheat: off for the rest of this game run (connected to a multiplayer server)%s",
+                g_stop ? "" : "; this KenshiPureCheats.dll has no kpCheatStop, its window stays but does nothing");
+            return;
+        }
+        g_frame(gw);
     }
 }

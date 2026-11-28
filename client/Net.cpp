@@ -125,6 +125,11 @@ namespace kp
         if (g_on) g_net.OnFrame(GetTickCount64());
     }
 
+    bool NetConnected()
+    {
+        return g_on && g_net.CoreState() == KP_CORE_WELCOMED;
+    }
+
     void NetStop()
     {
         if (!g_on) return;

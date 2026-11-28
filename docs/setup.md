@@ -90,6 +90,10 @@ It also installs the network core `KenshiPureCore.dll`, so build that first with
 powershell -ExecutionPolicy Bypass -File scripts\install-client.ps1 -GameDir "<Kenshi folder>"
 ```
 
+For a PC without build tools (a friend joining a game): `scripts\make-package.ps1` builds
+`build\package\KenshiPure-<version>.zip` with double-click install and uninstall and the server for the host
+(steps: `docs/playing-together.md`).
+
 The loader writes `<Kenshi>\mods\KenshiPure\KenshiPureLoader.log`, the plugin `KenshiPure.log` next to it. Kenshi's own crash dumps land in the
 game folder as `crashDump<version>_x64.dmp`. Tests of the install script:
 `powershell -ExecutionPolicy Bypass -Command "Import-Module Pester -RequiredVersion 3.4.0; Invoke-Pester scripts\tests"`.

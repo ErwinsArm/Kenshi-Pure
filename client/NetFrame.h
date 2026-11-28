@@ -114,6 +114,8 @@ namespace kp
         // Leaves the server and stops the core (blocks up to ~300 ms).
         void Stop();
         bool Running() const { return core_ != 0; }
+        // KpCoreState of the core (KP_CORE_STOPPED when it does not run); takes the core's mutex for a copy.
+        int CoreState() const;
         const NetStats& Stats() const { return stats_; }
         // Latest remote pose of a player seen by this frame side; false if none.
         bool Remote(unsigned short playerId, KpRemotePose* out) const;

@@ -119,7 +119,7 @@ KenshiCoop and WorldOfKenshi compared; calls by KenshiLib name, RVAs there are 1
 | G7 | World lifecycle (save load/unload, never touch stale pointers) and **zones** | **Closed** (M5: a save keeps a body unless its squad is left out: `Platoon::serialiseEverything` detour, the body stays in the world; hands checked after a world change; zones: temporary squads, no body outside the loaded zones, removed after 1 s outside, as `ActivePlatoon::unloadCheck`). Before: (remote-bodies.md G7, Removal): `~GameWorld` runs only at exit; detect reloads by an edge (KenshiCoop) or `resetGame`; keep hands, not pointers; `destroy` is deferred. Open: saves writing remote bodies, zones; runtime: M5 reload and save test, M6 starts both players together | Medium (crashes) |
 | G14 | ENet peer timeout vs. main-thread stalls of ~60 s | ENet gives up after 5–30 s of silence (pinned source, **M**); the client's network thread keeps servicing ENet during a stall: a 60 s frame-thread stall keeps the connection in `kp-core-test` (**M**); in game the ~19 s start and a ~6 s save load kept it (**M**); a long in-game stall not seen yet | Low (was Medium) |
 | G9 | Can two Kenshi instances run on one PC (Steam)? They would also share logs and the same game folder | Runtime, vanilla Kenshi, user approves and runs | Low: the test bot (M2) and a second PC are fallbacks |
-| G10 | Pause and game speed (up to ×20): a remote body moves only while the local game runs, at the local speed | M6 criterion: both players at the same speed, or speed sync is out of scope | Low |
+| G10 | Pause and game speed (up to ×20): a remote body moves only while the local game runs, at the local speed | **Closed** (the user's rule: always x1, no player pause while connected; speed lock, client.md "Game speed (M6)"; runs on 1.0.65 and 1.0.68) | Low |
 | G11 | Indoor floors (`Character+0xa4`) | Out of scope; remote bodies inside buildings may glitch | Low |
 
 G8, G6, G13 come first (M0). G1-G5, G7, G12 are load-bearing analysis (Opus high), no game run.
@@ -209,11 +209,16 @@ it; empty squads are removed by the game; no body outside the loaded zones). Det
 - In game: bot starts → a body appears and walks; stops → it vanishes; save/load/menu → no crash,
   no leftover body.
 
-**M6 – two real players** (S if M5 holds)
-- Two PCs/people (two instances on one PC only if G9 allows; logs would collide, so each needs its
-  own log name), server on one; both start a new vanilla game **at the same location** (bodies
-  outside active zones are probably not ticked, G7) and at the same game speed (or speed sync is
-  out of scope, G10). Check: each sees the other's character walk where the other walks.
+**M6 – two real players** (S if M5 holds) — **prepared, waiting for the user's test with the friend**
+- Two PCs/people, server on the host's PC; both start a new vanilla game with the same start and meet
+  there. Check: each sees the other's character walk where the other walks.
+- Done before the real test ([client.md](client.md) "Game speed (M6)", "Multiplayer package (M6)"): the
+  package for the friend (`scripts/make-package.ps1`: DLLs, install/uninstall, Kenshi version check,
+  server for the host), steps for both people ([playing-together.md](playing-together.md)), cheats off
+  for the run once connected (and not in the package), G10 decided by the user: always x1, no player
+  pause (speed lock). Unattended runs on 1.0.65 and 1.0.68 against the bot passed (**M**).
+- G9 (two instances on one PC): not tried; the two single-client runs on both builds and the real
+  test cover it.
 
 Order: M0 (done) → M1 (after the G2 sheet) → M2 (only after M0's proof) → M3 → M4; G3/G4/G7 analysis
 during M3–M4; then M5, M6. Static work (G2-G5, G7, G12) needs no game and may overlap the user's runs.

@@ -27,7 +27,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Save,
     [int]$Seconds = 200,
     [string]$BotArgs = "--around-first --radius 300 --speed 60",
-    [string]$Grep = "standin:|remote:|autoload:|exception|FAIL|net: (welcomed|connection|player)",
+    [string]$Grep = "standin:|remote:|autoload:|speed:|cheat:|build:|exception|FAIL|net: (welcomed|connection|player)",
     [int]$StartTimeout = 240,
     [string]$Cfg = "",
     [string]$Steps = "",
@@ -77,7 +77,11 @@ if (Test-Path $kpBackup) { Move-Item $kpBackup $kpCfg -Force; Write-Host "restor
 if (Test-Path $pluginsBackup) { Move-Item $pluginsBackup $plugins -Force; Write-Host "restored Plugins_x64.cfg left over by an aborted run" }
 Remove-Item (Join-Path $mod "autoload.txt") -ErrorAction SilentlyContinue
 Remove-SaveCopy
-Get-Process kp-server, kp-bot -ErrorAction SilentlyContinue | Stop-Process -Force -Confirm:$false
+# Only our test copies (build
+et\Release): a real server the host started from the package keeps running.
+$netRelease = Join-Path $net "Release"
+Get-Process kp-server, kp-bot -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($netRelease, [StringComparison]::OrdinalIgnoreCase) } |
+    Stop-Process -Force -Confirm:$false
 $server = $null; $bot = $null; $bot2 = $null; $game = $null; $exitedAt = $null
 # Waits up to $sec seconds; returns early when Kenshi has exited by itself (a quit step).
 function Wait-Run([int]$sec) {

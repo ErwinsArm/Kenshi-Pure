@@ -119,4 +119,49 @@ Describe "install-client.ps1" {
     It "refuses a folder that is not a Kenshi install" {
         { & $script -GameDir (Join-Path $TestDrive "nothing") -NoGameCheck } | Should Throw
     }
+
+    It "sets the server address, port and player name it is given, in place" {
+        $g = Join-Path $TestDrive "g8"
+        $build = New-FakeGame $g
+        New-Item -ItemType Directory -Force "$g\mods\KenshiPure" | Out-Null
+        [IO.File]::WriteAllText("$g\mods\KenshiPure\KenshiPure.cfg", "# mine`r`nhost=127.0.0.1`r`nname=player`r`nremote_range=3000`r`n", [Text.Encoding]::ASCII)
+        & $script -GameDir $g -BuildDir $build -CoreDir $build -ServerHost 100.64.0.9 -Port 27900 -PlayerName "Nei Two" -NoGameCheck | Out-Null
+        [IO.File]::ReadAllText("$g\mods\KenshiPure\KenshiPure.cfg") | Should Be "# mine`r`nhost=100.64.0.9`r`nname=Nei Two`r`nremote_range=3000`r`nport=27900`r`n"
+        { & $script -GameDir $g -BuildDir $build -CoreDir $build -PlayerName "a=b" -NoGameCheck } | Should Throw
+        { & $script -GameDir $g -BuildDir $build -CoreDir $build -ServerHost "bad host" -NoGameCheck } | Should Throw
+        { & $script -GameDir $g -BuildDir $build -CoreDir $build -PlayerName ("x" * 33) -NoGameCheck } | Should Throw
+    }
+
+    It "refuses -Cheats when there is no cheat DLL (the multiplayer package)" {
+        $g = Join-Path $TestDrive "g9"
+        $build = New-FakeGame $g
+        { & $script -GameDir $g -BuildDir $build -CoreDir $build -Cheats -NoGameCheck } | Should Throw
+        Test-Path "$g\mods\KenshiPure" | Should Be $false
+    }
+
+    It "runs from a package folder and installs only Kenshi builds it knows" {
+        $g = Join-Path $TestDrive "g10"
+        $build = New-FakeGame $g $true $false
+        $pkg = Join-Path $TestDrive "pkg"
+        New-Item -ItemType Directory -Force "$pkg\lib" | Out-Null
+        Copy-Item $script "$pkg\install-client.ps1"
+        Copy-Item (Join-Path $PSScriptRoot "..\lib\CfgEdit.ps1") "$pkg\lib\CfgEdit.ps1"
+        foreach ($d in @("KenshiPureLoader.dll", "KenshiPure.dll", "KenshiPureCore.dll")) { Copy-Item "$build\$d" "$pkg\$d" }
+        [IO.File]::WriteAllBytes("$g\kenshi_x64.exe", [byte[]](7, 7, 7))
+        [IO.File]::WriteAllText("$pkg\builds.txt", "#build 1.0.99 " + ("0" * 64) + " not this one`r`n", [Text.Encoding]::ASCII)
+        $plugins0 = Get-Bytes "$g\Plugins_x64.cfg"
+        { & "$pkg\install-client.ps1" -GameDir $g -ServerHost 100.64.0.9 -PlayerName Friend } | Should Throw
+        Get-Bytes "$g\Plugins_x64.cfg" | Should Be $plugins0
+        Test-Path "$g\mods\KenshiPure" | Should Be $false
+
+        $sha = (Get-FileHash -Algorithm SHA256 "$g\kenshi_x64.exe").Hash.ToLowerInvariant()
+        [IO.File]::WriteAllText("$pkg\builds.txt", "#build 1.0.68 $sha Steam 1.0.68`r`n", [Text.Encoding]::ASCII)
+        & "$pkg\install-client.ps1" -GameDir $g -ServerHost 100.64.0.9 -PlayerName Friend | Out-Null
+        Test-Path "$g\mods\KenshiPure\KenshiPureCore.dll" | Should Be $true
+        Test-Path "$g\mods\KenshiPure\KenshiPureCheats.dll" | Should Be $false
+        [IO.File]::ReadAllText("$g\mods\KenshiPure\KenshiPure.cfg") | Should Be "host=100.64.0.9`r`nport=27850`r`nname=Friend`r`n"
+        [IO.File]::ReadAllText("$g\Plugins_x64.cfg") | Should Not Match "AnarchyLoader"
+        & "$pkg\install-client.ps1" -GameDir $g -Uninstall | Out-Null
+        Get-Bytes "$g\Plugins_x64.cfg" | Should Be $plugins0
+    }
 }

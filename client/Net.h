@@ -8,6 +8,8 @@ namespace kp
     void NetStart();
     // Per frame, after PoseOnFrame: hands over the local pose (10 Hz), drains and logs remote ones.
     void NetOnFrame();
+    // True while welcomed by a server (multiplayer: x1 and no pause, no cheats). Frame thread.
+    bool NetConnected();
     // Leaves the server and stops the network thread (called once at game exit).
     void NetStop();
 }
